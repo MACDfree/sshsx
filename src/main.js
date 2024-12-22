@@ -23,19 +23,15 @@ const createWindow = () => {
     },
   });
 
-  mainWindow.menuBarVisible = false;
+  mainWindow.menuBarVisible = true;
 
   console.log(`__dirname: ${__dirname}`);
-  console.log(
-    `MAIN_WINDOW_VITE_DEV_SERVER_URL: ${MAIN_WINDOW_VITE_DEV_SERVER_URL}`,
-  );
+  console.log(`MAIN_WINDOW_VITE_DEV_SERVER_URL: ${MAIN_WINDOW_VITE_DEV_SERVER_URL}`);
   // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
-    mainWindow.loadFile(
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-    );
+    mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
 
   // Open the DevTools.
@@ -90,16 +86,13 @@ ipcMain.handle('connect-ssh', async (_, config) => {
             })
             .on('close', () => {
               sshClient.end();
-              mainWindow.webContents.send(
-                'ssh-data',
-                '\r\nConnection closed.\r\n',
-              );
+              mainWindow.webContents.send('ssh-data', '\r\nConnection closed.\r\n');
             });
           stream.stderr.on('data', (data) => {
             mainWindow.webContents.send('ssh-data', data.toString());
           });
         });
-        resolve("connected");
+        resolve('connected');
       })
       .on('error', (err) => {
         reject(err);
@@ -113,6 +106,21 @@ ipcMain.on('set-window', (event, config) => {
   if (sshStream) sshStream.setWindow(config.rows, config.cols, 0, 0);
 });
 
-ipcMain.on('bell', (event)=>{
+ipcMain.on('bell', (event) => {
   shell.beep();
-})
+});
+
+let config = {
+  hosts: [
+    {
+      id: '3c7b3718-9839-47ee-aeb7-511792776469',
+      name: 'macd@192.168.2.21:22',
+      options: {
+        host: '192.168.2.21',
+        port: 22,
+        user: 'macd',
+        privateKeys: '',
+      },
+    },
+  ],
+};
