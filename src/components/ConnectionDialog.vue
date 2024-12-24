@@ -24,29 +24,35 @@
             <label for="protocol">名称</label>
             <input type="text" id="name" value="" v-model="connectionInfo.name" />
           </div>
-          <div class="form-group">
-            <label for="host">主机</label>
-            <input type="text" id="host" v-model="connectionInfo.options.host" />
+          <div class="form-group2">
+            <div class="form-group host-group">
+              <label for="host">主机</label>
+              <input type="text" id="host" v-model="connectionInfo.options.host" />
+            </div>
+            <div class="form-group port-group">
+              <label for="port">端口</label>
+              <input type="number" id="port" v-model="connectionInfo.options.port" />
+            </div>
           </div>
-          <div class="form-group">
-            <label for="port">端口</label>
-            <input type="number" id="port" v-model="connectionInfo.options.port" />
-          </div>
-          <div class="form-group">
-            <label for="username">用户名</label>
-            <input type="text" id="user" v-model="connectionInfo.options.user" />
-          </div>
-          <div class="form-group">
-            <label for="password">密码</label>
-            <input type="password" id="password" value="" v-model="connectionInfo.options.password" />
+          <div class="form-group2">
+            <div class="form-group user-group">
+              <label for="username">用户名</label>
+              <input type="text" id="user" v-model="connectionInfo.options.user" />
+            </div>
+            <div class="form-group pass-group">
+              <label for="password">密码</label>
+              <input type="password" id="password" value="" v-model="connectionInfo.options.password" />
+            </div>
           </div>
           <div class="form-group">
             <label for="username">私钥</label>
             <input type="text" id="privatekey" value="" v-model="connectionInfo.options.privatekey" />
           </div>
           <div class="form-actions">
-            <button class="close">Close</button>
-            <button class="login">Login</button>
+            <button type="button" class="save" v-if="currentID === '-1'" @click="save">保存</button>
+            <button type="button" class="delete" v-else @click="del">删除</button>
+            <button type="button" class="close" @click="closeDialog">关闭</button>
+            <button type="button" class="login" v-if="currentID !== '-1'" @click="login">登录</button>
           </div>
         </form>
       </div>
@@ -55,57 +61,25 @@
 </template>
 
 <script setup>
-import { times } from 'lodash';
 import { ref, useTemplateRef, onMounted } from 'vue';
+
+const emit = defineEmits(['login'])
 
 const connectionsDialog = useTemplateRef('connections-dialog');
 
-const connections = ref([
-  {
-    id: '1',
-    name: 'macd@192.168.2.21:22',
-    options: {
-      host: '192.168.2.21',
-      port: 22,
-      user: 'macd',
-      password: '11111',
-      privateKeys: '',
-    },
-  },
-  {
-    id: '2',
-    name: 'macd@192.168.2.22:22',
-    options: {
-      host: '192.168.2.22',
-      port: 22,
-      user: 'macd',
-      password: '11111',
-      privateKeys: '',
-    },
-  },
-  {
-    id: '3',
-    name: 'macd@192.168.2.23:22',
-    options: {
-      host: '192.168.2.23',
-      port: 22,
-      user: 'macd',
-      password: '11111',
-      privateKeys: '',
-    },
-  },
-  {
-    id: '4',
-    name: 'macd@192.168.2.24:22',
-    options: {
-      host: '192.168.2.24',
-      port: 22,
-      user: 'macd',
-      password: '11111',
-      privateKeys: '',
-    },
-  },
-]);
+function openConnInfoDialog() {
+  window.configAPI.getAllConnConfigs().then((res) => {
+    console.log(res);
+    connections.value = res;
+  });
+  connectionsDialog.value.showModal();
+}
+
+defineExpose({
+  openConnInfoDialog,
+});
+
+const connections = ref([]);
 
 const connectionInfo = ref({
   id: '',
@@ -120,11 +94,6 @@ const connectionInfo = ref({
 });
 
 const currentID = ref('-1');
-
-onMounted(() => {
-  console.log(connectionsDialog.value);
-  connectionsDialog.value.showModal();
-});
 
 function switchConn(id) {
   if (id === '-1') {
@@ -145,17 +114,59 @@ function switchConn(id) {
   }
   currentID.value = id;
 }
+
+function save(event) {
+  // 必填项校验
+  if (!connectionInfo.value.name) {
+    alert('请输入名称');
+    return;
+  }
+  if (!connectionInfo.value.options.host) {
+    alert('请输入主机');
+    return;
+  }
+  if (!connectionInfo.value.options.port) {
+    alert('请输入端口');
+    return;
+  }
+  if (!connectionInfo.value.options.user) {
+    alert('请输入用户名');
+  }
+  connectionInfo.value.id = Date.now();
+  connections.value.push(connectionInfo.value);
+  currentID.value = connectionInfo.value.id;
+}
+
+function closeDialog(event) {
+  connectionsDialog.value.close();
+}
+
+function login(event) {
+  // 登录逻辑
+  console.log('login');
+  emit('login', currentID.value, connectionInfo.value.name);
+  connectionsDialog.value.close();
+}
+
+function del(event) {
+  const res = confirm('确定删除？');
+  if (!res) return;
+  const index = connections.value.findIndex((conn) => conn.id === currentID.value);
+  connections.value.splice(index, 1);
+  currentID.value = '-1';
+}
 </script>
 
 <style lang="less" scoped>
 dialog {
-  width: 700px;
+  width: 500px;
+  height: 350px;
   border: none;
   border-radius: 8px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   overflow: hidden;
 
-  top: 50%;
+  top: 40%;
   left: 50%;
   transform: translate(-50%, -50%);
 
@@ -185,9 +196,11 @@ dialog {
 }
 
 .sidebar {
-  width: 35%;
+  width: 40%;
   border-right: 1px solid #ccc;
   overflow-y: auto;
+  height: 316px;
+  scrollbar-width: thin;
 
   ul {
     list-style: none;
@@ -209,8 +222,19 @@ dialog {
 }
 
 .form-container {
-  width: 65%;
+  width: 60%;
   padding: 0 20px;
+  .form-group2 {
+    display: flex;
+    .host-group,
+    .user-group {
+      flex-grow: 1;
+      margin-right: 5px;
+    }
+  }
+  #port {
+    width: 80px;
+  }
 }
 
 .form-group {
@@ -225,21 +249,22 @@ dialog {
 
 .form-group input {
   width: 100%;
-  padding: 8px;
+  padding: 4px;
   font-size: 12px;
   border: 1px solid #ccc;
-  border-radius: 4px;
+  border-radius: 2px;
 }
 
 .form-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  margin-top: 20px;
 }
 
 .form-actions button {
-  padding: 8px 16px;
-  font-size: 14px;
+  padding: 6px 16px;
+  font-size: 12px;
   border: none;
   border-radius: 4px;
   cursor: pointer;

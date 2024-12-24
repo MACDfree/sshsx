@@ -19,7 +19,7 @@
     <!-- 标签页内容 -->
     <div class="tabs-content">
       <div v-for="tab in tabs" :key="tab.id" v-show="tab.id === currentTab">
-        {{ tab.id }}
+        <slot v-bind="tab" name="tab-content"></slot>
       </div>
     </div>
   </div>
@@ -42,6 +42,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['tab-change', 'tab-close', 'tab-add']);
+defineExpose({
+  addTabFunc,
+});
 
 const tabs = ref(props.initialTabs);
 const currentTab = ref(tabs.value[0]?.id);
@@ -73,16 +76,28 @@ const closeTab = (tabId) => {
 };
 
 // 添加标签页
-const addTab = () => {
-  const newTab = {
-    id: `tab-${Date.now()}`,
-    title: `新标签页 ${tabs.value.length + 1}`,
-    closable: true,
-  };
+const addTab = (evnet) => {
+  // const newTab = {
+  //   id: `tab-${Date.now()}`,
+  //   title: `新标签页 ${tabs.value.length + 1}`,
+  //   closable: true,
+  // };
+  emit('tab-add', evnet);
+  // tabs.value.push(newTab);
+  // currentTab.value = newTab.id;
 
-  tabs.value.push(newTab);
-  currentTab.value = newTab.id;
-  emit('tab-add', newTab);
+  // // 滚动到新标签
+  // setTimeout(() => {
+  //   const tabsEl = tabsList.value;
+  //   if (tabsEl) {
+  //     tabsEl.scrollLeft = tabsEl.scrollWidth;
+  //   }
+  // });
+};
+
+function addTabFunc(tab) {
+  tabs.value.push(tab);
+  currentTab.value = tab.id;
 
   // 滚动到新标签
   setTimeout(() => {
@@ -91,19 +106,19 @@ const addTab = () => {
       tabsEl.scrollLeft = tabsEl.scrollWidth;
     }
   });
-};
+}
 
 // 监听 props 变化
-watch(
-  () => props.initialTabs,
-  (newTabs) => {
-    tabs.value = newTabs;
-    if (newTabs.length && !tabs.value.find((tab) => tab.id === currentTab.value)) {
-      currentTab.value = newTabs[0].id;
-    }
-  },
-  { deep: true },
-);
+// watch(
+//   () => props.initialTabs,
+//   (newTabs) => {
+//     tabs.value = newTabs;
+//     if (newTabs.length && !tabs.value.find((tab) => tab.id === currentTab.value)) {
+//       currentTab.value = newTabs[0].id;
+//     }
+//   },
+//   { deep: true },
+// );
 </script>
 
 <style lang="less" scoped>
@@ -111,7 +126,7 @@ watch(
   display: flex;
   flex-direction: column;
   height: 100%;
-  border: 1px solid #e8e8e8;
+  // border: 1px solid #e8e8e8;
 }
 
 .tabs-header {
@@ -154,7 +169,7 @@ watch(
 }
 
 .tab-title {
-  max-width: 80px;
+  max-width: 100px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -193,6 +208,10 @@ watch(
 .tabs-content {
   flex: 1;
   overflow: auto;
-  padding: 16px;
+  // padding: 5px;
+
+  &>div {
+    height: 100%;
+  }
 }
 </style>
