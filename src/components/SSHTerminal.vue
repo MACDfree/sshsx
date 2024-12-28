@@ -8,7 +8,7 @@
 import { Terminal } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { FitAddon } from '@xterm/addon-fit';
-import { onMounted, useTemplateRef } from 'vue';
+import { onMounted, useTemplateRef, watch, nextTick } from 'vue';
 import _ from 'lodash';
 
 const props = defineProps({
@@ -21,19 +21,24 @@ const props = defineProps({
   clientId: {
     type: String,
     default: () => '',
-  }
+  },
+  isActive: {
+    type: Boolean,
+    default: () => false,
+  },
 });
 
-defineExpose({
-  resizeTerminal,
-});
+const emit = defineEmits(['close']);
 
 const terminalDiv = useTemplateRef('terminalDiv');
+
+let resizeTerminal;
+let terminal;
 
 onMounted(async () => {
   console.log(`props.connId: ${props.connId}, props.clientId: ${props.clientId}`);
 
-  const terminal = new Terminal({
+  terminal = new Terminal({
     // cursorBlink: true,
     // fontSize: 14,
     fontFamily: 'Consolas',
@@ -41,27 +46,34 @@ onMounted(async () => {
   const fitAddon = new FitAddon();
   terminal.loadAddon(fitAddon);
   terminal.open(terminalDiv.value);
+  terminal.focus();
   fitAddon.fit();
 
   // 防抖
-  const resizeTerminal = _.debounce(() => {
+  resizeTerminal = _.debounce(() => {
     fitAddon.fit();
     window.sshAPI.setWindow(props.clientId, { cols: terminal.cols, rows: terminal.rows });
   }, 100);
   window.addEventListener('resize', resizeTerminal); // 监听窗口大小变化
 
   const connConfig = await window.configAPI.getConnConfig(props.connId);
+  console.log(connConfig);
 
-  window.sshAPI.connect(props.clientId, {
-    host: connConfig.options.host,
-    port: connConfig.options.port,
-    username: connConfig.options.user,
-    password: connConfig.options.password,
-  }, {
-    cols: terminal.cols,
-    rows: terminal.rows,
-    term: 'xterm-256color',
-  })
+  window.sshAPI
+    .connect(
+      props.clientId,
+      {
+        host: connConfig.options.host,
+        port: connConfig.options.port,
+        username: connConfig.options.user,
+        password: connConfig.options.password,
+      },
+      {
+        cols: terminal.cols,
+        rows: terminal.rows,
+        term: 'xterm-256color',
+      },
+    )
     .then((message) => {
       console.log(message);
       terminal.writeln('Connected to SSH server.');
@@ -71,7 +83,7 @@ onMounted(async () => {
     });
 
   terminal.onData((data) => {
-    window.sshAPI.send(props.clientId,data);
+    window.sshAPI.send(props.clientId, data);
   });
 
   terminal.onBell((event) => {
@@ -83,10 +95,28 @@ onMounted(async () => {
     terminal.write(data);
   });
 
-  window.sshAPI.close(props.clientId, ()=>{
+  window.sshAPI.close(props.clientId, () => {
     terminal.writeln('Connection closed.');
-  })
+    emit('close', props.clientId);
+  });
 });
+
+watch(
+  () => props.isActive,
+  (newVal) => {
+    if (newVal) {
+      nextTick(() => {
+        if (terminal) {
+          terminal.focus();
+        }
+        // 激活窗口时，调整终端大小
+        if (resizeTerminal) {
+          resizeTerminal();
+        }
+      });
+    }
+  },
+);
 </script>
 
 <style lang="less" scoped>

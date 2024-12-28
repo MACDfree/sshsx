@@ -52,6 +52,12 @@ class SSHClient {
       this.sshStream.write(data);
     }
   }
+
+  disconnect() {
+    if (this.sshClient) {
+      this.sshClient.end();
+    }
+  }
 }
 
 export { SSHClient };

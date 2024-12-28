@@ -4,6 +4,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('sshAPI', {
   connect: (clientID, connConfig, termConfig) => ipcRenderer.invoke('ssh:connect', clientID, connConfig, termConfig),
+  disconnect: (clientID) => ipcRenderer.send('ssh:disconnect', clientID),
   send: (clientID, data) => ipcRenderer.send('ssh:send', clientID, data),
   receive: (clientID, callback) => ipcRenderer.on(`ssh:receive-${clientID}`, (event, data) => callback(data)),
   setWindow: (clientID, config) => ipcRenderer.send('ssh:set-window', clientID, config),
@@ -14,7 +15,6 @@ contextBridge.exposeInMainWorld('sshAPI', {
 contextBridge.exposeInMainWorld('configAPI', {
   getAllConnConfigs: () => ipcRenderer.invoke('config:get-all-conn-configs'),
   getConnConfig: (connID) => ipcRenderer.invoke('config:get-conn-config', connID),
-  addConnConfig: (config) => ipcRenderer.invoke('config:add-conn-config', config),
-  updateConnConfig: (connID, config) => ipcRenderer.invoke('config:update-conn-config', connID, config),
+  addOrUpdateConnConfig: (config) => ipcRenderer.invoke('config:add-or-update-conn-config', config),
   deleteConnConfig: (connID) => ipcRenderer.invoke('config:delete-conn-config', connID)
 })

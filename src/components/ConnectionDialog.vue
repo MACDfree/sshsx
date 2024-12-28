@@ -36,7 +36,7 @@
           </div>
           <div class="form-group2">
             <div class="form-group user-group">
-              <label for="username">用户名</label>
+              <label for="user">用户名</label>
               <input type="text" id="user" v-model="connectionInfo.options.user" />
             </div>
             <div class="form-group pass-group">
@@ -45,14 +45,15 @@
             </div>
           </div>
           <div class="form-group">
-            <label for="username">私钥</label>
+            <label for="privatekey">私钥</label>
             <input type="text" id="privatekey" value="" v-model="connectionInfo.options.privatekey" />
           </div>
           <div class="form-actions">
-            <button type="button" class="save" v-if="currentID === '-1'" @click="save">保存</button>
-            <button type="button" class="delete" v-else @click="del">删除</button>
+            <button type="button" class="save" @click="save">保存</button>
+            <button type="button" class="delete" v-if="currentID !== '-1'" @click="del">删除</button>
+            <button type="button" class="login" v-if="currentID !== '-1'" @click="login">SSH</button>
+            <button type="button" class="login" v-if="currentID !== '-1'" @click="loginSFTP">SFTP</button>
             <button type="button" class="close" @click="closeDialog">关闭</button>
-            <button type="button" class="login" v-if="currentID !== '-1'" @click="login">登录</button>
           </div>
         </form>
       </div>
@@ -61,9 +62,10 @@
 </template>
 
 <script setup>
-import { ref, useTemplateRef, onMounted } from 'vue';
+import { ref, useTemplateRef, onMounted, toRaw } from 'vue';
+import { v4 as uuidv4 } from 'uuid';
 
-const emit = defineEmits(['login'])
+const emit = defineEmits(['login']);
 
 const connectionsDialog = useTemplateRef('connections-dialog');
 
@@ -72,6 +74,21 @@ function openConnInfoDialog() {
     console.log(res);
     connections.value = res;
   });
+
+  if (currentID.value === '-1') {
+    connectionInfo.value = {
+      id: '',
+      name: '',
+      options: {
+        host: '',
+        port: 22,
+        user: '',
+        password: '',
+        privatekey: '',
+      },
+    };
+  }
+
   connectionsDialog.value.showModal();
 }
 
@@ -87,7 +104,7 @@ const connectionInfo = ref({
   options: {
     host: '',
     port: 22,
-    username: '',
+    user: '',
     password: '',
     privatekey: '',
   },
@@ -103,7 +120,7 @@ function switchConn(id) {
       options: {
         host: '',
         port: 22,
-        username: '',
+        user: '',
         password: '',
         privatekey: '',
       },
@@ -132,9 +149,17 @@ function save(event) {
   if (!connectionInfo.value.options.user) {
     alert('请输入用户名');
   }
-  connectionInfo.value.id = Date.now();
-  connections.value.push(connectionInfo.value);
-  currentID.value = connectionInfo.value.id;
+
+  if (!connectionInfo.value.id) {
+    connectionInfo.value.id = uuidv4();
+  }
+
+  window.configAPI.addOrUpdateConnConfig(toRaw(connectionInfo.value)).then((res) => {
+    if (res==='add') {
+      connections.value.push(connectionInfo.value);
+    }
+    currentID.value = connectionInfo.value.id;
+  });
 }
 
 function closeDialog(event) {
@@ -144,22 +169,32 @@ function closeDialog(event) {
 function login(event) {
   // 登录逻辑
   console.log('login');
-  emit('login', currentID.value, connectionInfo.value.name);
+  emit('login', currentID.value, connectionInfo.value.name, 'ssh');
+  connectionsDialog.value.close();
+}
+
+function loginSFTP(event) {
+  // 登录逻辑
+  console.log('loginSFTP');
+  emit('login', currentID.value, connectionInfo.value.name, 'sftp');
   connectionsDialog.value.close();
 }
 
 function del(event) {
   const res = confirm('确定删除？');
   if (!res) return;
-  const index = connections.value.findIndex((conn) => conn.id === currentID.value);
-  connections.value.splice(index, 1);
-  currentID.value = '-1';
+  window.configAPI.deleteConnConfig(currentID.value).then((res) => {
+    console.log(res);
+    const index = connections.value.findIndex((conn) => conn.id === currentID.value);
+    connections.value.splice(index, 1);
+    currentID.value = '-1';
+  });
 }
 </script>
 
 <style lang="less" scoped>
 dialog {
-  width: 500px;
+  width: 600px;
   height: 350px;
   border: none;
   border-radius: 8px;
@@ -263,7 +298,7 @@ dialog {
 }
 
 .form-actions button {
-  padding: 6px 16px;
+  padding: 6px 10px;
   font-size: 12px;
   border: none;
   border-radius: 4px;
@@ -275,7 +310,7 @@ dialog {
   color: white;
 }
 
-.form-actions button.close {
+.form-actions button.delete {
   background-color: #dc3545;
   color: white;
 }

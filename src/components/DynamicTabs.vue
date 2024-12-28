@@ -12,14 +12,15 @@
           <span class="tab-title">{{ tab.title }}</span>
           <span v-if="tab.closable" class="tab-close" @click.stop="closeTab(tab.id)">×</span>
         </div>
-        <div class="tab-add" @click="addTab" v-if="canAdd">+</div>
+        <div class="tab-add" @click="addTab">+</div>
       </div>
     </div>
 
     <!-- 标签页内容 -->
     <div class="tabs-content">
       <div v-for="tab in tabs" :key="tab.id" v-show="tab.id === currentTab">
-        <slot v-bind="tab" name="tab-content"></slot>
+        <SSHTerminal v-if="tab.type==='ssh'" :client-id="tab.id" :conn-id="tab.connId" :is-active="tab.id === currentTab" @close="closeTab"></SSHTerminal>
+        <FileBrowser v-else :client-id="tab.id" :conn-id="tab.connId" :is-active="tab.id === currentTab" @close="closeTab"></FileBrowser>
       </div>
     </div>
   </div>
@@ -27,27 +28,16 @@
 
 <script setup>
 import { ref, watch } from 'vue';
-
-const props = defineProps({
-  // 初始标签页
-  initialTabs: {
-    type: Array,
-    default: () => [],
-  },
-  // 是否可以添加标签页
-  canAdd: {
-    type: Boolean,
-    default: true,
-  },
-});
+import SSHTerminal from './SSHTerminal.vue';
+import FileBrowser from './FileBrowser.vue';
 
 const emit = defineEmits(['tab-change', 'tab-close', 'tab-add']);
 defineExpose({
   addTabFunc,
 });
 
-const tabs = ref(props.initialTabs);
-const currentTab = ref(tabs.value[0]?.id);
+const tabs = ref([]);
+const currentTab = ref('');
 const tabsList = ref(null);
 
 // 切换标签页
@@ -71,6 +61,8 @@ const closeTab = (tabId) => {
       emit('tab-change', nextTab.id);
     }
   }
+
+  window.sshAPI.disconnect(tabId);
 
   emit('tab-close', tabId);
 };
@@ -169,7 +161,7 @@ function addTabFunc(tab) {
 }
 
 .tab-title {
-  max-width: 100px;
+  max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

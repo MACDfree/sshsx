@@ -1,13 +1,19 @@
 import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
-import { Client } from 'ssh2';
-import {SSHClient} from './main-sshclients';
+import { SSHClient } from './main-sshclients';
+import Store from 'electron-store';
+import yaml from 'js-yaml'
+import contextMenu from 'electron-context-menu';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
+
+contextMenu({
+	showSaveImageAs: true
+});
 
 let mainWindow;
 
@@ -75,9 +81,25 @@ ipcMain.handle('ssh:connect', async (_, clientID, connConfig, termConfig) => {
   return sshClient.connect(connConfig, termConfig);
 });
 
+ipcMain.on('ssh:disconnect', (event, clientID) => {
+  const sshClient = sshClients[clientID];
+  if (!sshClient) {
+    return;
+  }
+  if (sshClient.isClosed) {
+    delete sshClients[clientID];
+    return;
+  }
+  sshClient.disconnect();
+});
+
 ipcMain.on('ssh:set-window', (event, clientID, config) => {
   const sshClient = sshClients[clientID];
-  if (sshClient && sshClient.isClosed) {
+  if (!sshClient) {
+    return;
+  }
+  if (sshClient.isClosed) {
+    delete sshClients[clientID];
     return;
   }
   sshClient.setWindow(config.rows, config.cols);
@@ -85,7 +107,11 @@ ipcMain.on('ssh:set-window', (event, clientID, config) => {
 
 ipcMain.on('ssh:send', (event, clientID, data) => {
   const sshClient = sshClients[clientID];
-  if (sshClient && sshClient.isClosed) {
+  if (!sshClient) {
+    return;
+  }
+  if (sshClient.isClosed) {
+    delete sshClients[clientID];
     return;
   }
   sshClient.send(data);
@@ -93,6 +119,12 @@ ipcMain.on('ssh:send', (event, clientID, data) => {
 
 ipcMain.on('bell', (event) => {
   shell.beep();
+});
+
+const store = new Store({
+  fileExtension: 'yaml',
+  serialize: yaml.dump,
+  deserialize: yaml.load,
 });
 
 let config = {
@@ -113,17 +145,48 @@ let config = {
 
 ipcMain.handle('config:get-all-conn-configs', async (event) => {
   return new Promise((resolve, reject) => {
-    resolve(config.hosts);
+    resolve(store.get('hosts')??[]);
   });
-})
+});
 
 ipcMain.handle('config:get-conn-config', async (event, connID) => {
   return new Promise((resolve, reject) => {
-    const c = config.hosts.find(host => host.id === connID)
+    const hosts = store.get('hosts')??[];
+    const c = hosts.find((host) => host.id === connID);
     if (c) {
       resolve(c);
     } else {
       reject(`not found connID: ${connID}`);
     }
   });
-})
+});
+
+ipcMain.handle('config:add-or-update-conn-config', async (event, connConfig) => {
+  return new Promise((resolve, reject) => {
+    const hosts = store.get('hosts')??[];
+    const index = hosts.findIndex((host) => host.id === connConfig.id);
+    if (index === -1) {
+      hosts.push(connConfig);
+      store.set('hosts', hosts);
+      resolve('add');
+    } else {
+      hosts[index] = connConfig;
+      store.set('hosts', hosts);
+      resolve('update');
+    }
+  });
+});
+
+ipcMain.handle('config:delete-conn-config', async (event, connID) => {
+  return new Promise((resolve, reject) => {
+    const hosts = store.get('hosts')??[];
+    const index = hosts.findIndex((host) => host.id === connID);
+    if (index === -1) {
+      reject(`not found connID: ${connID}`);
+    } else {
+      hosts.splice(index, 1);
+      store.set('hosts', hosts);
+      resolve(`delete: ${connID}}`);
+    }
+  });
+});
