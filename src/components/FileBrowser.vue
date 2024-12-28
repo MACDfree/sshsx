@@ -1,86 +1,349 @@
 <template>
-  <div class="container" ref="container" :style="{ gridTemplateColumns: `${leftWidth}fr 4px 1fr` }">
-    <div class="localfile">
-      <div class="tool-bar">工具栏</div>
-      <div class="path-bar">路径栏</div>
-      <div class="file-list">
-        <table>
-          <thead>
-            <tr class="text-left bg-gray-200">
-              <th class="p-2">名称</th>
-              <th class="p-2">大小</th>
-              <th class="p-2">修改日期</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="p-2">1</td>
-              <td class="p-2">1</td>
-              <td class="p-2">1</td>
-            </tr>
-            <tr>
-              <td class="p-2">1</td>
-              <td class="p-2">1</td>
-              <td class="p-2">1</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <div class="divider" @mousedown="startDragging"></div>
-    <div class="remotefile">
-      <div class="tool-bar">工具栏</div>
-      <div class="path-bar">路径栏</div>
-      <div class="file-list">文件列表</div>
+  <div class="sftp-file">
+    <div class="path-bar"><span v-for="path in splitPaths" :key="path.realPath" @click="changePath(path.realPath)">{{ path.path }}</span></div>
+    <div class="file-list">
+      <table>
+        <thead>
+          <tr>
+            <th v-for="(col, index) in columns" :key="col.key" :style="{ width: col.width + 'px' }">
+              {{ col.title }}
+              <div class="resize-handle" @mousedown="startResize($event, index)"></div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in data" :key="row.id">
+            <td v-for="col in columns" :key="col.key">{{ row[col.key] }}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </template>
 
 <script setup>
-import { useTemplateRef, ref } from 'vue';
+import { ref, computed } from 'vue';
 
-const container = useTemplateRef('container');
-const leftWidth = ref(1);
-const isDragging = ref(false);
+const currentPath = ref('/home/macd/');
 
-function startDragging(e) {
-  isDragging.value = true;
-  document.body.style.cursor = 'ew-resize';
-  document.addEventListener('mousemove', onMouseMove);
-  document.addEventListener('mouseup', stopDragging);
-}
+const splitPaths = computed(() => {
+  let paths = currentPath.value.split('/');
+  paths = paths.filter(path=>path).map(path=>path+'/');
+  paths = ['/', ...paths];
+  
+  let ret = paths.map((path, index) => {
+    return {
+      realPath: paths.slice(0, index + 1).join(''),
+      path: path,
+    };
+  });
+  ret = ret.reverse();
+  return ret;
+});
 
-const onMouseMove = (e) => {
-  if (!isDragging.value || !container.value) return;
-
-  const containerRect = container.value.getBoundingClientRect();
-  const width = containerRect.width;
-  console.log(e.clientX, containerRect.left, width);
-  const newLeftWidth = e.clientX - containerRect.left;
-
-  // 限制最小宽度
-  if (newLeftWidth < 100 || newLeftWidth > containerRect.width - 100) return;
-
-  leftWidth.value = newLeftWidth / (width - newLeftWidth);
-  console.log(leftWidth.value);
+const changePath = (path) => {
+  if (path === currentPath.value) {
+    console.log('当前路径，应该要打开路径输入页面');
+    return;
+  }
+  console.log('changePath', path);
+  currentPath.value = path;
 };
 
-const stopDragging = () => {
-  isDragging.value = false;
-  document.body.style.cursor = '';
-  document.removeEventListener('mousemove', onMouseMove);
-  document.removeEventListener('mouseup', stopDragging);
+const columns = ref([
+  { key: 'name', title: '名称', width: 200 },
+  { key: 'size', title: '大小', width: 100 },
+  { key: 'changed', title: '修改日期', width: 180 },
+  { key: 'rights', title: '权限', width: 100 },
+  { key: 'owner', title: '所有者', width: 80 },
+]);
+
+const data = ref([
+  { id: 1, name: 'paperless-ngx', size: '', changed: '2024-12-28 23:21:00', rights: 'rwxrwxr-x', owner: 'macd' },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+  {
+    id: 2,
+    name: 'supervisord.conf',
+    size: '2000 KB',
+    changed: '2024-12-28 23:23:00',
+    rights: 'rw-rw-r--',
+    owner: 'root',
+  },
+]);
+
+let isDragging = false;
+
+const startResize = (e, index) => {
+  isDragging = true;
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+  const startX = e.clientX;
+  const startWidth = columns.value[index].width;
+
+  const onMouseMove = (moveEvent) => {
+    if (!isDragging) {
+      return;
+    }
+    const delta = moveEvent.clientX - startX;
+    columns.value[index].width = Math.max(startWidth + delta, 20); // 设置最小宽度
+  };
+
+  const onMouseUp = () => {
+    isDragging = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  };
+
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
 };
 </script>
 
 <style lang="less" scoped>
-.container {
-  display: grid;
+.sftp-file {
+  display: flex;
+  flex-direction: column;
   height: 100%;
+  font-size: 13px;
+  overflow: hidden;
 }
+.path-bar {
+  display: inline-flex;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
+  padding: 5px 3px;
+  background-color: #99b4d1;
+  &>span {
+    cursor: default;
+  }
+  &>span:hover {
+    color: #666;
+  }
+  &>span:hover ~ span {
+    color: #666;
+  }
+}
+.file-list {
+  flex: 1;
+  height: 100%;
+  overflow: auto;
+  & > table {
+    table-layout: fixed;
+    width: 10px;
+    border-collapse: collapse;
+  }
+  th {
+    position: sticky;
+    top: 0;
+    background-color: #fff;
+    z-index: 1;
+    text-align: left;
+  }
+  .resize-handle {
+    cursor: col-resize;
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 5px;
+    height: 100%;
 
-.divider {
-  background-color: #ccc;
-  cursor: ew-resize; /* 水平方向调整的光标 */
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 2;
+      width: 2px;
+      height: 100%;
+      background-color: #ccc;
+    }
+  }
+
+  th,
+  td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 2px 5px;
+  }
+  td:nth-child(2) {
+    text-align: right;
+  }
 }
 </style>
