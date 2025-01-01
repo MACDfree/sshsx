@@ -60,7 +60,7 @@ onMounted(async () => {
   console.log(connConfig);
 
   window.sshAPI
-    .connect(
+    .connectShell(
       props.clientId,
       {
         host: connConfig.options.host,
