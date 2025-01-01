@@ -6,6 +6,7 @@ import { SSHClient } from './main-sshclients';
 import Store from 'electron-store';
 import yaml from 'js-yaml';
 import contextMenu from 'electron-context-menu';
+import { randomUUID } from 'node:crypto';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -266,31 +267,51 @@ ipcMain.handle('ssh:start-drag', async (event, clientID, filePath) => {
 
   let stat = await sshClient.stat(filePath);
   if (!stat) {
-    console.log('file not exist', filePath)
+    console.log('file not exist', filePath);
     return;
   }
-  console.log('stat', stat)
+  console.log('stat', stat);
 
   const basename = path.basename(filePath);
   const fileType = stat.mode >>> 12;
+  let tempPath = path.join(app.getPath('temp'), 'sshsx_' + clientID, randomUUID());
+  console.log(tempPath);
+  await mkdir(tempPath);
+  const localPath = path.join(tempPath, basename);
   if (fileType === 8) {
     // 普通文件
-    console.log('file')
-    const tempPath = app.getPath('temp')
-    console.log(tempPath)
-
+    console.log('file');
+    await sshClient.download(filePath, localPath);
   } else if (fileType === 4) {
     // 目录
-    console.log('dir')
+    console.log('dir');
   } else {
     return;
   }
 
-  // event.sender.startDrag({
-  //   file: 'E:\\code\\js\\myssh\\my-vue-app\\src',
-  //   icon: 'E:\\code\\js\\myssh\\my-vue-app\\src\\drag-and-drop.png',
-  // });
+  event.sender.startDrag({
+    file: localPath,
+    icon: 'E:\\code\\js\\myssh\\my-vue-app\\src\\drag-and-drop.png',
+  });
 });
+
+function mkdir(dirPath) {
+  return new Promise((resolve, reject) => {
+    fs.mkdir(
+      dirPath,
+      {
+        recursive: true,
+      },
+      (err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        resolve();
+      },
+    );
+  });
+}
 
 const store = new Store({
   fileExtension: 'yaml',
