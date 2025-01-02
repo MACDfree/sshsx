@@ -176,9 +176,10 @@ ipcMain.handle('ssh:upload-files', async (_, clientID, filePaths, remotePath) =>
     console.log(`upload ${filePath} to ${remotePath}${basename}`);
     if (isDir) {
       const uploadFileList = await getAllFilePaths(filePath);
+      console.log('uploadFileList', uploadFileList);
       for (const j in uploadFileList) {
         const uploadFilePath = uploadFileList[j];
-        const relativePath = path.relative(filePath, uploadFilePath);
+        const relativePath = path.relative(filePath, uploadFilePath.replace(/\|\|aaisdirbb$/, ''));
         console.log(`relativePath=${relativePath}`);
         const remoteFilePath = path.join(remotePath, basename, relativePath).replaceAll('\\', '/');
         console.log(`remoteFilePath=${remoteFilePath}`);
@@ -193,7 +194,11 @@ ipcMain.handle('ssh:upload-files', async (_, clientID, filePaths, remotePath) =>
           // 文件已存在，需要人工确认一下
           console.log('file exists, need confirm');
         }
-        await sshClient.upload(filePath, remoteFilePath);
+        if (uploadFilePath.endsWith('||aaisdirbb')) {
+          await sshClient.mkdir(remoteFilePath);
+        } else {
+          await sshClient.upload(uploadFilePath, remoteFilePath);
+        }
       }
     } else {
       const stat = await sshClient.stat(path.join(remotePath, basename).replaceAll('\\', '/'));
@@ -226,6 +231,10 @@ async function getAllFilePaths(dirPath) {
 
   async function traverse(dirPath) {
     const entries = await readdir(dirPath);
+    if (entries.length === 0) {
+      uploadFileList.push(dirPath + '||aaisdirbb');
+      return;
+    }
     for (const i in entries) {
       const entry = entries[i];
       const fullPath = path.join(dirPath, entry); // 拼接完整路径
@@ -250,6 +259,22 @@ function isDirectory(filePath) {
         reject(err);
       } else {
         resolve(stats.isDirectory());
+      }
+    });
+  });
+}
+
+function getStat(filePath) {
+  return new Promise((resolve, reject) => {
+    fs.stat(filePath, (err, stats) => {
+      if (err) {
+        if (err.code==='ENOENT') {
+          resolve(false);
+          return;
+        }
+        reject(err);
+      } else {
+        resolve(stats);
       }
     });
   });
@@ -285,6 +310,30 @@ ipcMain.handle('ssh:start-drag', async (event, clientID, filePath) => {
   } else if (fileType === 4) {
     // 目录
     console.log('dir');
+    const remoteFilePaths = await getAllRemoteFilePaths(sshClient, filePath)
+    console.log(remoteFilePaths);
+    for (const remoteFilePath of remoteFilePaths) {
+      const relativePath = path.relative(filePath, remoteFilePath);
+      console.log('relativePath',relativePath);
+      const localFilePath = path.join(localPath, relativePath);
+      console.log('localFilePath',localFilePath);
+      const localDirPath = path.dirname(localFilePath);
+      console.log('localDirPath',localDirPath);
+      let stat = await getStat(localDirPath);
+      if (!stat) {
+        await mkdir(localDirPath);
+      }
+
+      stat = await getStat(localFilePath);
+      if (stat) {
+        console.log('file exists, need confirm');
+      }
+      if (remoteFilePath.endsWith('/')) {
+        await mkdir(localFilePath);
+      } else {
+        await sshClient.download(remoteFilePath, localFilePath);
+      }
+    }
   } else {
     return;
   }
@@ -311,6 +360,31 @@ function mkdir(dirPath) {
       },
     );
   });
+}
+
+async function getAllRemoteFilePaths(sshClient, dirPath) {
+  const filePaths = [];
+
+  async function traverse(dPath) {
+    const entries = await sshClient.readDir(dPath);
+    if (entries.length===0) {
+      filePaths.push(dPath+'/');
+    }
+    for (const i in entries) {
+      const entry = entries[i];
+      const fullPath = path.join(dPath, entry.filename).replaceAll('\\', '/'); // 拼接完整路径
+      const isdir = (entry.attrs.mode >>> 12) === 4;
+      if (isdir) {
+        await traverse(fullPath); // 如果是文件夹，递归调用
+      } else {
+        filePaths.push(fullPath); // 如果是文件，添加到列表
+      }
+    }
+  }
+
+  await traverse(dirPath);
+
+  return filePaths;  
 }
 
 const store = new Store({
