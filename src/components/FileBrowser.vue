@@ -1,5 +1,6 @@
 <template>
   <div class="sftp-file">
+    <div class="tool-bar"><button>刷新</button><button>上传</button></div>
     <div class="path-bar">
       <span v-for="path in splitPaths" :key="path.realPath" @click="changePath(path.realPath)">{{ path.path }}</span>
     </div>
@@ -19,10 +20,9 @@
               v-for="col in columns"
               :key="col.key"
               :class="{ [col.key]: true, selected: currentID === row.id }"
-              :draggable="col.key === 'name'"
               @click="selected(col.key, row.id)"
               @dblclick="openFile(col.key, row)"
-              @dragstart.prevent="dragStart($event, col.key, row.name)"
+              @contextmenu.prevent="showContextMenu($event, col.key, row.name)"
             >
               <span v-if="col.key === 'name'">{{ fileTypeIcon[row['type']] }}</span>
               {{ row[col.key] }}
@@ -35,7 +35,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 
 const props = defineProps({
   // 这个是连接配置的ID
@@ -231,11 +231,8 @@ const handleDropFiles = (event) => {
   });
 };
 
-const dragStart = (event, columnName, fileName) => {
-  if (columnName !== 'name') {
-    return;
-  }
-  window.sshAPI.startDrag(props.clientId, currentPath.value + fileName);
+const showContextMenu = (event, columnName, fileName) => {
+  window.sshAPI.showContextMenu('sftp', { clientID: props.clientId, remotePath: currentPath.value + fileName });
 };
 </script>
 

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, shell, dialog, clipboard } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import started from 'electron-squirrel-startup';
@@ -13,9 +13,9 @@ if (started) {
   app.quit();
 }
 
-contextMenu({
-  showSaveImageAs: true,
-});
+// contextMenu({
+//   showSaveImageAs: true,
+// });
 
 let mainWindow;
 
@@ -268,7 +268,7 @@ function getStat(filePath) {
   return new Promise((resolve, reject) => {
     fs.stat(filePath, (err, stats) => {
       if (err) {
-        if (err.code==='ENOENT') {
+        if (err.code === 'ENOENT') {
           resolve(false);
           return;
         }
@@ -310,15 +310,15 @@ ipcMain.handle('ssh:start-drag', async (event, clientID, filePath) => {
   } else if (fileType === 4) {
     // 目录
     console.log('dir');
-    const remoteFilePaths = await getAllRemoteFilePaths(sshClient, filePath)
+    const remoteFilePaths = await getAllRemoteFilePaths(sshClient, filePath);
     console.log(remoteFilePaths);
     for (const remoteFilePath of remoteFilePaths) {
       const relativePath = path.relative(filePath, remoteFilePath);
-      console.log('relativePath',relativePath);
+      console.log('relativePath', relativePath);
       const localFilePath = path.join(localPath, relativePath);
-      console.log('localFilePath',localFilePath);
+      console.log('localFilePath', localFilePath);
       const localDirPath = path.dirname(localFilePath);
-      console.log('localDirPath',localDirPath);
+      console.log('localDirPath', localDirPath);
       let stat = await getStat(localDirPath);
       if (!stat) {
         await mkdir(localDirPath);
@@ -367,13 +367,13 @@ async function getAllRemoteFilePaths(sshClient, dirPath) {
 
   async function traverse(dPath) {
     const entries = await sshClient.readDir(dPath);
-    if (entries.length===0) {
-      filePaths.push(dPath+'/');
+    if (entries.length === 0) {
+      filePaths.push(dPath + '/');
     }
     for (const i in entries) {
       const entry = entries[i];
       const fullPath = path.join(dPath, entry.filename).replaceAll('\\', '/'); // 拼接完整路径
-      const isdir = (entry.attrs.mode >>> 12) === 4;
+      const isdir = entry.attrs.mode >>> 12 === 4;
       if (isdir) {
         await traverse(fullPath); // 如果是文件夹，递归调用
       } else {
@@ -384,8 +384,137 @@ async function getAllRemoteFilePaths(sshClient, dirPath) {
 
   await traverse(dirPath);
 
-  return filePaths;  
+  return filePaths;
 }
+
+async function download(clientID, remotePath, localPath) {
+  const sshClient = sshClients[clientID];
+  if (!sshClient) {
+    return;
+  }
+  if (!sshClient.isConnected) {
+    delete sshClients[clientID];
+    return;
+  }
+
+  let stat = await sshClient.stat(remotePath);
+  if (!stat) {
+    console.log('file not exist', remotePath);
+    return;
+  }
+  console.log('stat', stat);
+
+  const basename = path.basename(remotePath);
+  const fileType = stat.mode >>> 12;
+  if (fileType === 8) {
+    // 普通文件
+    console.log('file');
+    await sshClient.download(remotePath, path.join(localPath, basename));
+  } else if (fileType === 4) {
+    // 目录
+    console.log('dir');
+    const remoteFilePaths = await getAllRemoteFilePaths(sshClient, remotePath);
+    console.log(remoteFilePaths);
+    for (const remoteFilePath of remoteFilePaths) {
+      const relativePath = path.relative(remotePath, remoteFilePath);
+      console.log('relativePath', relativePath);
+      const localFilePath = path.join(localPath, basename, relativePath);
+      console.log('localFilePath', localFilePath);
+      const localDirPath = path.dirname(localFilePath);
+      console.log('localDirPath', localDirPath);
+      let stat = await getStat(localDirPath);
+      if (!stat) {
+        await mkdir(localDirPath);
+      }
+
+      stat = await getStat(localFilePath);
+      if (stat) {
+        console.log('file exists, need confirm');
+      }
+      if (remoteFilePath.endsWith('/')) {
+        await mkdir(localFilePath);
+      } else {
+        await sshClient.download(remoteFilePath, localFilePath);
+      }
+    }
+  } else {
+    return;
+  }
+}
+
+ipcMain.on('ssh:show-context-menu', (event, type, args) => {
+  let template;
+  if (type === 'sftp') {
+    template = [
+      {
+        label: '下载',
+        click: async () => {
+          const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
+            properties: ['openDirectory'],
+          });
+          if (canceled) {
+            console.log('Dialog was canceled');
+            return;
+          }
+          const localPath = filePaths[0];
+          console.log(localPath);
+          await download(args.clientID, args.remotePath, localPath);
+        },
+      },
+      {
+        label: '删除',
+        click: async () => {
+          const { response } = await dialog.showMessageBox(mainWindow, {
+            message: `是否删除${args.remotePath}？`,
+            type: 'warning',
+            buttons: ['是', '否'],
+          });
+          if (response === 0) {
+            // TODO
+            //await remove(args.clientID, args.remotePath);
+          }
+        },
+      },
+      {
+        label: '复制路径',
+        click: () => {
+          clipboard.writeText(args.remotePath);
+        },
+      },
+      {
+        label: '复制文件名',
+        click: () => {
+          const fileName = path.basename(args.remotePath);
+          clipboard.writeText(fileName);
+        },
+      },
+      {
+        label: '创建文件夹',
+        click: () => {
+          // TODO
+        },
+      },
+    ];
+  } else if (type === 'ssh') {
+    template = [
+      {
+        label: '复制',
+        click: () => {
+          clipboard.writeText(args.selection);
+        },
+      },
+      {
+        label: '粘贴',
+        click: () => {
+          event.sender.paste();
+        },
+      },
+    ];
+  }
+
+  const menu = Menu.buildFromTemplate(template);
+  menu.popup({ window: BrowserWindow.fromWebContents(event.sender) });
+});
 
 const store = new Store({
   fileExtension: 'yaml',

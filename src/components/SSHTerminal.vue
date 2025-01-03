@@ -1,6 +1,6 @@
 <template>
   <div class="terminal-container">
-    <div ref="terminalDiv" class="terminal"></div>
+    <div ref="terminalDiv" class="terminal" @contextmenu.prevent="showContextMenu($event)"></div>
   </div>
 </template>
 
@@ -117,6 +117,10 @@ watch(
     }
   },
 );
+
+const showContextMenu = (event) => {
+  window.sshAPI.showContextMenu('ssh', { clientID: props.clientId, selection: terminal.getSelection() });
+};
 </script>
 
 <style lang="less" scoped>

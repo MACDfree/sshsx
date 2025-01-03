@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('sshAPI', {
     return webUtils.getPathForFile(file);
   },
   startDrag: (clientID, filePath)=> ipcRenderer.invoke('ssh:start-drag', clientID, filePath),
+  showContextMenu: (type, args)=> ipcRenderer.send('ssh:show-context-menu', type, args),
 });
 
 contextBridge.exposeInMainWorld('configAPI', {
