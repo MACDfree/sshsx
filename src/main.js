@@ -5,17 +5,11 @@ import started from 'electron-squirrel-startup';
 import { SSHClient } from './main-sshclients';
 import Store from 'electron-store';
 import yaml from 'js-yaml';
-import contextMenu from 'electron-context-menu';
-import { randomUUID } from 'node:crypto';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
 }
-
-// contextMenu({
-//   showSaveImageAs: true,
-// });
 
 let mainWindow;
 
@@ -279,70 +273,6 @@ function getStat(filePath) {
     });
   });
 }
-
-ipcMain.handle('ssh:start-drag', async (event, clientID, filePath) => {
-  const sshClient = sshClients[clientID];
-  if (!sshClient) {
-    return;
-  }
-  if (!sshClient.isConnected) {
-    delete sshClients[clientID];
-    return;
-  }
-
-  let stat = await sshClient.stat(filePath);
-  if (!stat) {
-    console.log('file not exist', filePath);
-    return;
-  }
-  console.log('stat', stat);
-
-  const basename = path.basename(filePath);
-  const fileType = stat.mode >>> 12;
-  let tempPath = path.join(app.getPath('temp'), 'sshsx_' + clientID, randomUUID());
-  console.log(tempPath);
-  await mkdir(tempPath);
-  const localPath = path.join(tempPath, basename);
-  if (fileType === 8) {
-    // 普通文件
-    console.log('file');
-    await sshClient.download(filePath, localPath);
-  } else if (fileType === 4) {
-    // 目录
-    console.log('dir');
-    const remoteFilePaths = await getAllRemoteFilePaths(sshClient, filePath);
-    console.log(remoteFilePaths);
-    for (const remoteFilePath of remoteFilePaths) {
-      const relativePath = path.relative(filePath, remoteFilePath);
-      console.log('relativePath', relativePath);
-      const localFilePath = path.join(localPath, relativePath);
-      console.log('localFilePath', localFilePath);
-      const localDirPath = path.dirname(localFilePath);
-      console.log('localDirPath', localDirPath);
-      let stat = await getStat(localDirPath);
-      if (!stat) {
-        await mkdir(localDirPath);
-      }
-
-      stat = await getStat(localFilePath);
-      if (stat) {
-        console.log('file exists, need confirm');
-      }
-      if (remoteFilePath.endsWith('/')) {
-        await mkdir(localFilePath);
-      } else {
-        await sshClient.download(remoteFilePath, localFilePath);
-      }
-    }
-  } else {
-    return;
-  }
-
-  event.sender.startDrag({
-    file: localPath,
-    icon: 'E:\\code\\js\\myssh\\my-vue-app\\src\\drag-and-drop.png',
-  });
-});
 
 function mkdir(dirPath) {
   return new Promise((resolve, reject) => {
