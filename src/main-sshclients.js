@@ -1,4 +1,5 @@
 import { Client } from 'ssh2';
+import { readFileSync } from 'node:fs';
 
 class SSHClient {
   sshStream;
@@ -8,6 +9,9 @@ class SSHClient {
     this.clientID = clientID;
     this.win = win;
     this.isConnected = false;
+    if (connConfig.privateKey) {
+      connConfig.privateKey = readFileSync(connConfig.privateKey)
+    }
     this.connConfig = connConfig;
   }
 
@@ -30,7 +34,7 @@ class SSHClient {
   }
 
   connectShell(termConfig) {
-    return this.connect(this.connConfig).then(() => {
+    return this.connect().then(() => {
       return new Promise((resolve, reject) => {
         this.sshClient.shell(termConfig, (err, stream) => {
           if (err) {
@@ -57,7 +61,7 @@ class SSHClient {
   }
 
   connectSFTP() {
-    return this.connect(this.connConfig).then(() => {
+    return this.connect().then(() => {
       return new Promise((resolve, reject) => {
         this.sshClient.sftp((err, sftp) => {
           if (err) {

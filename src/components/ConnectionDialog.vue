@@ -134,10 +134,6 @@ function switchConn(id) {
 
 function save(event) {
   // 必填项校验
-  if (!connectionInfo.value.name) {
-    alert('请输入名称');
-    return;
-  }
   if (!connectionInfo.value.options.host) {
     alert('请输入主机');
     return;
@@ -154,8 +150,17 @@ function save(event) {
     connectionInfo.value.id = uuidv4();
   }
 
+  if (!connectionInfo.value.name) {
+    connectionInfo.value.name =
+      connectionInfo.value.options.user +
+      '@' +
+      connectionInfo.value.options.host +
+      ':' +
+      connectionInfo.value.options.port;
+  }
+
   window.configAPI.addOrUpdateConnConfig(toRaw(connectionInfo.value)).then((res) => {
-    if (res==='add') {
+    if (res === 'add') {
       connections.value.push(connectionInfo.value);
     }
     currentID.value = connectionInfo.value.id;

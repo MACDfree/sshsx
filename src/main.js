@@ -13,6 +13,12 @@ if (started) {
 
 let mainWindow;
 
+const store = new Store({
+  fileExtension: 'yaml',
+  serialize: yaml.dump,
+  deserialize: yaml.load,
+});
+
 const createWindow = () => {
   // Create the browser window.
   mainWindow = new BrowserWindow({
@@ -41,10 +47,36 @@ const createWindow = () => {
   // mainWindow.webContents.openDevTools();
 };
 
+let configFilePath;
+let configStore;
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  configFilePath = store.get('configFilePath');
+  if (!configFilePath || !fs.existsSync(configFilePath)) {
+    // 弹出文件选择框
+    const result = await dialog.showOpenDialog({
+      title: '选择配置文件',
+      buttonLabel: '选择',
+      properties: ['openFile'],
+      filters: [{ name: '配置文件', extensions: ['json', 'yaml', 'yml', 'ini'] }],
+    });
+
+    // 检查是否选择了文件
+    if (result.canceled || result.filePaths.length === 0) {
+      app.quit(); // 如果没有选择文件，退出应用
+      return;
+    }
+
+    // 保存配置文件路径
+    configFilePath = result.filePaths[0];
+    store.set('configFilePath', configFilePath);
+  }
+
+  configStore = ConfigUtil.getInstance(configFilePath);
+
   createWindow();
 
   // On OS X it's common to re-create a window in the app when the
@@ -446,21 +478,50 @@ ipcMain.on('ssh:show-context-menu', (event, type, args) => {
   menu.popup({ window: BrowserWindow.fromWebContents(event.sender) });
 });
 
-const store = new Store({
-  fileExtension: 'yaml',
-  serialize: yaml.dump,
-  deserialize: yaml.load,
-});
+class ConfigUtil {
+  static getInstance(configFilePath) {
+    if (!ConfigUtil.instance) {
+      ConfigUtil.instance = new ConfigUtil(configFilePath);
+    }
+    return ConfigUtil.instance;
+  }
+
+  constructor(configFilePath) {
+    this.configFilePath = configFilePath;
+    if (fs.existsSync(configFilePath)) {
+      this.config = yaml.load(fs.readFileSync(configFilePath, 'utf-8')) ?? {};
+    } else {
+      this.config = {};
+    }
+  }
+
+  get(key) {
+    return this.config[key];
+  }
+
+  set(key, value) {
+    this.config[key] = value;
+    this.save();
+  }
+
+  save() {
+    fs.writeFile(this.configFilePath, yaml.dump(this.config), 'utf-8', (err) => {
+      if (err) {
+        console.log('save config error', err);
+      }
+    });
+  }
+}
 
 ipcMain.handle('config:get-all-conn-configs', async (event) => {
   return new Promise((resolve, reject) => {
-    resolve(store.get('hosts') ?? []);
+    resolve(configStore.get('hosts') ?? []);
   });
 });
 
 ipcMain.handle('config:get-conn-config', async (event, connID) => {
   return new Promise((resolve, reject) => {
-    const hosts = store.get('hosts') ?? [];
+    const hosts = configStore.get('hosts') ?? [];
     const c = hosts.find((host) => host.id === connID);
     if (c) {
       resolve(c);
@@ -472,15 +533,15 @@ ipcMain.handle('config:get-conn-config', async (event, connID) => {
 
 ipcMain.handle('config:add-or-update-conn-config', async (event, connConfig) => {
   return new Promise((resolve, reject) => {
-    const hosts = store.get('hosts') ?? [];
+    const hosts = configStore.get('hosts') ?? [];
     const index = hosts.findIndex((host) => host.id === connConfig.id);
     if (index === -1) {
       hosts.push(connConfig);
-      store.set('hosts', hosts);
+      configStore.set('hosts', hosts);
       resolve('add');
     } else {
       hosts[index] = connConfig;
-      store.set('hosts', hosts);
+      configStore.set('hosts', hosts);
       resolve('update');
     }
   });
@@ -488,13 +549,13 @@ ipcMain.handle('config:add-or-update-conn-config', async (event, connConfig) => 
 
 ipcMain.handle('config:delete-conn-config', async (event, connID) => {
   return new Promise((resolve, reject) => {
-    const hosts = store.get('hosts') ?? [];
+    const hosts = configStore.get('hosts') ?? [];
     const index = hosts.findIndex((host) => host.id === connID);
     if (index === -1) {
       reject(`not found connID: ${connID}`);
     } else {
       hosts.splice(index, 1);
-      store.set('hosts', hosts);
+      configStore.set('hosts', hosts);
       resolve(`delete: ${connID}}`);
     }
   });

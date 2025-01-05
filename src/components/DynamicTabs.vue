@@ -99,18 +99,6 @@ function addTabFunc(tab) {
     }
   });
 }
-
-// 监听 props 变化
-// watch(
-//   () => props.initialTabs,
-//   (newTabs) => {
-//     tabs.value = newTabs;
-//     if (newTabs.length && !tabs.value.find((tab) => tab.id === currentTab.value)) {
-//       currentTab.value = newTabs[0].id;
-//     }
-//   },
-//   { deep: true },
-// );
 </script>
 
 <style lang="less" scoped>
@@ -124,7 +112,7 @@ function addTabFunc(tab) {
 .tabs-header {
   position: relative;
   border-bottom: 1px solid #e8e8e8;
-  background: #fff;
+  background: #f0f0f0;
   font-size: 12px;
 }
 
@@ -143,7 +131,7 @@ function addTabFunc(tab) {
   align-items: center;
   padding: 4px 10px;
   margin-right: 1px;
-  background: #fafafa;
+  background: #f3f3f3;
   cursor: pointer;
   transition: all 0.3s;
   border: 1px solid transparent;
@@ -152,11 +140,15 @@ function addTabFunc(tab) {
     background: #fff;
     border-color: #e8e8e8;
     border-bottom: 1px solid #fff;
-    margin-bottom: -1px;
+    // margin-bottom: -1px;
+  }
+
+  &.active:hover {
+    background: #fdfdfd;
   }
 
   &:hover {
-    color: #1890ff;
+    background-color: #ededed;
   }
 }
 
@@ -186,14 +178,13 @@ function addTabFunc(tab) {
   justify-content: center;
   width: 25px;
   margin: 2px;
-  background: #fff;
+  background: #f0f0f0;
   border: 1px dashed #d9d9d9;
   border-radius: 2px;
   cursor: pointer;
 
   &:hover {
-    color: #1890ff;
-    border-color: #1890ff;
+    background-color: #ededed;
   }
 }
 

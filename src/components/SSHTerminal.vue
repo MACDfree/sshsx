@@ -95,6 +95,7 @@ onMounted(async () => {
         port: connConfig.options.port,
         username: connConfig.options.user,
         password: connConfig.options.password,
+        privateKey: connConfig.options.privatekey,
       },
       {
         cols: terminal.cols,
