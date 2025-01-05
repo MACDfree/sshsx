@@ -1,7 +1,6 @@
 <template>
   <dialog ref="connections-dialog" id="connections-dialog">
     <div class="dialog-header">
-      <!-- <img src="icon.png" alt="Icon"> -->
       <span>登录</span>
     </div>
     <div class="dialog-content">
@@ -26,17 +25,17 @@
           </div>
           <div class="form-group2">
             <div class="form-group host-group">
-              <label for="host">主机</label>
+              <label for="host">主机*</label>
               <input type="text" id="host" v-model="connectionInfo.options.host" />
             </div>
             <div class="form-group port-group">
-              <label for="port">端口</label>
+              <label for="port">端口*</label>
               <input type="number" id="port" v-model="connectionInfo.options.port" />
             </div>
           </div>
           <div class="form-group2">
             <div class="form-group user-group">
-              <label for="user">用户名</label>
+              <label for="user">用户名*</label>
               <input type="text" id="user" v-model="connectionInfo.options.user" />
             </div>
             <div class="form-group pass-group">
@@ -54,6 +53,33 @@
             <button type="button" class="login" v-if="currentID !== '-1'" @click="login">SSH</button>
             <button type="button" class="login" v-if="currentID !== '-1'" @click="loginSFTP">SFTP</button>
             <button type="button" class="close" @click="closeDialog">关闭</button>
+          </div>
+          <hr />
+          <div class="form-group2">
+            <div class="form-group">
+              <label for="font">字体名称</label>
+              <input type="text" id="font" value="" v-model="connectionInfo.options.font" />
+            </div>
+            <div class="form-group">
+              <label for="fontsize">字体大小</label>
+              <input type="number" id="fontsize" value="" v-model="connectionInfo.options.fontsize" />
+            </div>
+          </div>
+          <div class="form-group2">
+            <div class="form-group">
+              <label for="term">终端类型</label>
+              <select name="term" v-model="connectionInfo.options.term">
+                <option value="xterm-256color">xterm-256color</option>
+                <option value="vt100">vt100</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="theme">主题</label>
+              <select name="theme" v-model="connectionInfo.options.theme">
+                <option value="dracula">Dracula</option>
+                <option value="solarized_light">Solarized Light</option>
+              </select>
+            </div>
           </div>
         </form>
       </div>
@@ -85,6 +111,10 @@ function openConnInfoDialog() {
         user: '',
         password: '',
         privatekey: '',
+        font: 'Consolas',
+        fontsize: 14,
+        term: 'xterm-256color',
+        theme: 'dracula',
       },
     };
   }
@@ -107,6 +137,10 @@ const connectionInfo = ref({
     user: '',
     password: '',
     privatekey: '',
+    font: 'Consolas',
+    fontsize: 14,
+    term: 'xterm-256color',
+    theme: 'dracula',
   },
 });
 
@@ -123,6 +157,10 @@ function switchConn(id) {
         user: '',
         password: '',
         privatekey: '',
+        font: 'Consolas',
+        fontsize: 14,
+        term: 'xterm-256color',
+        theme: 'dracula',
       },
     };
   } else {
@@ -214,14 +252,6 @@ dialog {
     font-size: 12px;
     background-color: #e8e8e8;
     padding: 5px;
-    display: flex;
-    align-items: center;
-
-    img {
-      width: 20px;
-      height: 20px;
-      margin-right: 10px;
-    }
 
     span {
       font-weight: bold;
@@ -264,16 +294,21 @@ dialog {
 .form-container {
   width: 60%;
   padding: 0 20px;
+  height: 316px;
+  overflow-y: auto;
   .form-group2 {
     display: flex;
-    .host-group,
-    .user-group {
+    .form-group:first-child {
       flex-grow: 1;
       margin-right: 5px;
     }
   }
-  #port {
+  #port,
+  #fontsize {
     width: 80px;
+  }
+  hr {
+    margin: 20px 0;
   }
 }
 
