@@ -27,3 +27,8 @@ contextBridge.exposeInMainWorld('configAPI', {
   addOrUpdateConnConfig: (config) => ipcRenderer.invoke('config:add-or-update-conn-config', config),
   deleteConnConfig: (connID) => ipcRenderer.invoke('config:delete-conn-config', connID),
 });
+
+contextBridge.exposeInMainWorld('dialogAPI', {
+  info: (message) => ipcRenderer.invoke('dialog:info', message),
+  confirm: (message) => ipcRenderer.invoke('dialog:confirm', message),
+});

@@ -21,7 +21,7 @@
         <form class="form">
           <div class="form-group">
             <label for="protocol">名称</label>
-            <input type="text" id="name" value="" v-model="connectionInfo.name" />
+            <input type="text" id="name" value="" v-model="connectionInfo.name" autofocus />
           </div>
           <div class="form-group2">
             <div class="form-group host-group">
@@ -170,18 +170,18 @@ function switchConn(id) {
   currentID.value = id;
 }
 
-function save(event) {
+async function save(event) {
   // 必填项校验
   if (!connectionInfo.value.options.host) {
-    alert('请输入主机');
+    await window.dialogAPI.info('请输入IP地址');
     return;
   }
   if (!connectionInfo.value.options.port) {
-    alert('请输入端口');
+    await window.dialogAPI.info('请输入端口');
     return;
   }
   if (!connectionInfo.value.options.user) {
-    alert('请输入用户名');
+    await window.dialogAPI.info('请输入用户名');
   }
 
   if (!connectionInfo.value.id) {
@@ -223,9 +223,10 @@ function loginSFTP(event) {
   connectionsDialog.value.close();
 }
 
-function del(event) {
-  const res = confirm('确定删除？');
-  if (!res) return;
+async function del(event) {
+  const res = await window.dialogAPI.confirm('确定删除？');
+  console.log(res);
+  if (res.response===1) return;
   window.configAPI.deleteConnConfig(currentID.value).then((res) => {
     console.log(res);
     const index = connections.value.findIndex((conn) => conn.id === currentID.value);
@@ -280,6 +281,7 @@ dialog {
     li {
       padding: 5px 10px;
       cursor: pointer;
+      white-space: nowrap;
     }
 
     li:hover {

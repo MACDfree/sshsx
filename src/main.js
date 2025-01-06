@@ -560,3 +560,20 @@ ipcMain.handle('config:delete-conn-config', async (event, connID) => {
     }
   });
 });
+
+
+ipcMain.handle('dialog:info', async (event, message) => {
+  return await dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    message,
+  });
+});
+
+ipcMain.handle('dialog:confirm', async (event, message) => {
+  return await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    message,
+    buttons: ['确定', '取消'],
+    cancelId: 1,
+  });
+});
