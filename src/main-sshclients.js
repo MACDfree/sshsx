@@ -10,7 +10,7 @@ class SSHClient {
     this.win = win;
     this.isConnected = false;
     if (connConfig.privateKey) {
-      connConfig.privateKey = readFileSync(connConfig.privateKey)
+      connConfig.privateKey = readFileSync(connConfig.privateKey);
     }
     this.connConfig = connConfig;
   }
@@ -107,32 +107,50 @@ class SSHClient {
 
   getHomeDir() {
     return new Promise((resolve, reject) => {
-      this.sftpClient.ext_home_dir(this.connConfig.username, (err, path) => {
+      this.sshClient.exec('echo $HOME', (err, stream) => {
         if (err) {
           reject(err);
           return;
-        }
-        if (!path.endsWith('/')) {
-          path += '/';
-        }
-        resolve(path);
+        };
+
+        stream
+          .on('close', (code, signal) => {
+            console.log('Stream :: close :: code: ' + code + ', signal: ' + signal);
+            stream.close();
+          })
+          .on('data', (data) => {
+            let path = data.toString().trim();
+            if (!path.endsWith('/')) {
+              path += '/';
+            }
+            resolve(path);
+            console.log('STDOUT: ' + path);
+          })
+          .stderr.on('data', (data) => {
+            console.log('STDERR: ' + data);
+          });
       });
     });
   }
 
   upload(localPath, remotePath) {
     return new Promise((resolve, reject) => {
-      this.sftpClient.fastPut(localPath, remotePath, {
-        step: function(total_transferred, chunk, total) {
-          console.log('uploaded', total_transferred/total);
-        }
-      }, (err) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve('uploaded');
-      });
+      this.sftpClient.fastPut(
+        localPath,
+        remotePath,
+        {
+          step: function (total_transferred, chunk, total) {
+            console.log('uploaded', total_transferred / total);
+          },
+        },
+        (err) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve('uploaded');
+        },
+      );
     });
   }
 
@@ -168,17 +186,22 @@ class SSHClient {
 
   download(remotePath, localPath) {
     return new Promise((resolve, reject) => {
-      this.sftpClient.fastGet(remotePath, localPath,{
-        step: function(total_transferred, chunk, total) {
-          console.log('download', total_transferred/total);
-        }
-      }, (err) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        resolve();
-      });
+      this.sftpClient.fastGet(
+        remotePath,
+        localPath,
+        {
+          step: function (total_transferred, chunk, total) {
+            console.log('download', total_transferred / total);
+          },
+        },
+        (err) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve();
+        },
+      );
     });
   }
 }

@@ -233,6 +233,9 @@ const handleDropFiles = (event) => {
 };
 
 const showContextMenu = (event, columnName, fileName) => {
+  if (columnName !== 'name') {
+    return;
+  }
   window.sshAPI.showContextMenu('sftp', { clientID: props.clientId, remotePath: currentPath.value + fileName });
 };
 </script>
