@@ -1,6 +1,6 @@
 <template>
-  <DynamicTabs ref="tabsRef" @tab-change="handleTabChange" @tab-close="handleTabClose" @tab-add="handleTabAdd">
-  </DynamicTabs>
+  <Tabs ref="tabsRef" @tab-change="handleTabChange" @tab-close="handleTabClose" @tab-add="handleTabAdd">
+  </Tabs>
 
   <ConnectionDialog ref="connectionDialogRef" @login="handleLogin"></ConnectionDialog>
 </template>
@@ -8,7 +8,8 @@
 <script setup>
 import { ref, useTemplateRef, onMounted } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
-import DynamicTabs from './components/DynamicTabs.vue';
+// import DynamicTabs from './components/DynamicTabs.vue';
+import Tabs from './components/Tabs.vue';
 import ConnectionDialog from './components/ConnectionDialog.vue';
 
 const tabsRef = ref(null);
