@@ -4,38 +4,20 @@
     <div class="path-bar">
       <span v-for="path in splitPaths" :key="path.realPath" @click="changePath(path.realPath)">{{ path.path }}</span>
     </div>
-    <div class="file-list" @dragover.prevent @drop.prevent="handleDropFiles">
-      <table>
-        <thead>
-          <tr>
-            <th v-for="(col, index) in columns" :key="col.key" :style="{ width: col.width + 'px' }">
-              {{ col.title }}
-              <div class="resize-handle" @mousedown="startResize($event, index)"></div>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in fileList" :key="row.id">
-            <td
-              v-for="col in columns"
-              :key="col.key"
-              :class="{ [col.key]: true, selected: currentID === row.id }"
-              @click="selected(col.key, row.id)"
-              @dblclick="openFile(col.key, row)"
-              @contextmenu.prevent="showContextMenu($event, col.key, row.name)"
-            >
-              <span v-if="col.key === 'name'">{{ fileTypeIcon[row['type']] }}</span>
-              {{ row[col.key] }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <n-data-table
+      :columns="columns"
+      :data="fileList"
+      :bordered="false"
+      single-column
+      :max-height="250"
+      :scroll-x="1800"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
+import { NDataTable } from 'naive-ui';
 
 const props = defineProps({
   // 这个是连接配置的ID
@@ -108,11 +90,11 @@ const openFile = (key, row) => {
 };
 
 const columns = ref([
-  { key: 'name', title: '名称', width: 200 },
-  { key: 'size', title: '大小', width: 100 },
-  { key: 'changed', title: '修改日期', width: 180 },
-  { key: 'rights', title: '权限', width: 100 },
-  { key: 'owner', title: '所有者', width: 80 },
+  { key: 'name', title: '名称', resizable: true },
+  { key: 'size', title: '大小', resizable: true },
+  { key: 'changed', title: '修改日期', resizable: true },
+  { key: 'rights', title: '权限', resizable: true },
+  { key: 'owner', title: '所有者', resizable: true },
 ]);
 
 const fileList = ref([]);
@@ -253,7 +235,6 @@ const showContextMenu = (event, columnName, fileName) => {
   flex-direction: row-reverse;
   justify-content: flex-end;
   padding: 5px 3px;
-  color: #000;
   background-color: #99b4d1;
   & > span {
     cursor: default;

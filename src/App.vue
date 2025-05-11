@@ -1,8 +1,10 @@
 <template>
-  <Tabs ref="tabsRef" @tab-change="handleTabChange" @tab-close="handleTabClose" @tab-add="handleTabAdd">
-  </Tabs>
-
-  <ConnectionDialog ref="connectionDialogRef" @login="handleLogin"></ConnectionDialog>
+  <n-dialog-provider>
+    <n-message-provider>
+      <Tabs ref="tabsRef" @tab-change="handleTabChange" @tab-close="handleTabClose" @tab-add="handleTabAdd"> </Tabs>
+      <SessionDialog ref="connectionDialogRef" @login="handleLogin"></SessionDialog>
+    </n-message-provider>
+  </n-dialog-provider>
 </template>
 
 <script setup>
@@ -11,6 +13,8 @@ import { v4 as uuidv4 } from 'uuid';
 // import DynamicTabs from './components/DynamicTabs.vue';
 import Tabs from './components/Tabs.vue';
 import ConnectionDialog from './components/ConnectionDialog.vue';
+import SessionDialog from './components/SessionDialog.vue';
+import { NDialogProvider, NMessageProvider } from 'naive-ui';
 
 const tabsRef = ref(null);
 
@@ -35,10 +39,8 @@ const handleLogin = (connId, name, type) => {
     type: type,
     connId: connId,
     closable: true,
-  })
+  });
 };
-
 </script>
 
-<style lang="less" scoped>
-</style>
+<style lang="less" scoped></style>

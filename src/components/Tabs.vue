@@ -9,9 +9,19 @@
     tab-style="min-width: 80px;"
     @close="closeTab"
     @add="addTab"
-    style="--n-tab-padding: 4px 8px;--n-tab-gap: 2px;--n-pane-padding-top: 2px;"
+    @update:value="switchTab"
+    animated
+    style="--n-tab-padding: 4px 8px; --n-tab-gap: 2px; --n-pane-padding-top: 2px; height: 100vh"
+    pane-wrapper-style="flex: 1;"
   >
-    <n-tab-pane v-for="tab in tabs" :key="tab.id" :name="tab.id" :tab="tab.title" display-directive="show">
+    <n-tab-pane
+      v-for="tab in tabs"
+      :key="tab.id"
+      :name="tab.id"
+      :tab="tab.title"
+      display-directive="show"
+      style="height: 100%; overflow: auto"
+    >
       <SSHTerminal
         v-if="tab.type === 'ssh'"
         :client-id="tab.id"
@@ -20,22 +30,32 @@
         @close="closeTab"
       ></SSHTerminal>
       <FileBrowser
-        v-else
+        v-else-if="tab.type === 'sftp'"
         :client-id="tab.id"
         :conn-id="tab.connId"
         :is-active="tab.id === currentTab"
         @close="closeTab"
       ></FileBrowser>
+      <Settings v-else-if="tab.type === 'settings'"></Settings>
     </n-tab-pane>
-    <template #suffix>关闭</template>
+    <template #suffix>
+      <n-button strong secondary circle size="small" @click="openSettingsTab">
+        <template #icon>
+          <n-icon><SettingsOutline /></n-icon>
+        </template>
+      </n-button>
+    </template>
   </n-tabs>
 </template>
 
 <script setup>
 import { ref, watch, useTemplateRef, nextTick } from 'vue';
-import { NTabPane, NTabs } from 'naive-ui';
+import { NTabPane, NTabs, NIcon, NButton } from 'naive-ui';
 import SSHTerminal from './SSHTerminal.vue';
 import FileBrowser from './FileBrowser.vue';
+import SFTPBrowser from './SFTPBrowser.vue';
+import Settings from './Settings.vue';
+import { SettingsOutline } from '@vicons/ionicons5';
 
 const emit = defineEmits(['tab-change', 'tab-close', 'tab-add']);
 defineExpose({
@@ -48,7 +68,6 @@ const tabsRef = useTemplateRef('tabsRef');
 
 // 切换标签页
 const switchTab = (tabId) => {
-  currentTab.value = tabId;
   emit('tab-change', tabId);
 };
 
@@ -75,22 +94,7 @@ const closeTab = (tabId) => {
 
 // 添加标签页
 const addTab = (evnet) => {
-  // const newTab = {
-  //   id: `tab-${Date.now()}`,
-  //   title: `新标签页 ${tabs.value.length + 1}`,
-  //   closable: true,
-  // };
   emit('tab-add', evnet);
-  // tabs.value.push(newTab);
-  // currentTab.value = newTab.id;
-
-  // // 滚动到新标签
-  // setTimeout(() => {
-  //   const tabsEl = tabsList.value;
-  //   if (tabsEl) {
-  //     tabsEl.scrollLeft = tabsEl.scrollWidth;
-  //   }
-  // });
 };
 
 function addTabFunc(tab) {
@@ -98,8 +102,20 @@ function addTabFunc(tab) {
   currentTab.value = tab.id;
   nextTick(() => tabsRef.value?.syncBarPosition());
 }
+
+const openSettingsTab = () => {
+  // 如果已经存在设置标签页，切换到该标签页
+  const settingsTab = tabs.value.find((tab) => tab.id === 'settings');
+  if (settingsTab) {
+    currentTab.value = settingsTab.id;
+    return;
+  }
+  addTabFunc({
+    id: 'settings',
+    title: '设置',
+    type: 'settings',
+  });
+};
 </script>
 
-<style lang="less" scoped>
-
-</style>
+<style lang="less" scoped></style>
