@@ -1,8 +1,8 @@
 <template>
   <n-dialog-provider>
     <n-message-provider>
-      <Tabs ref="tabsRef" @tab-change="handleTabChange" @tab-close="handleTabClose" @tab-add="handleTabAdd"> </Tabs>
-      <SessionDialog ref="connectionDialogRef" @login="handleLogin"></SessionDialog>
+      <MainTabs ref="tabsRef" @tab-change="handleTabChange" @tab-close="handleTabClose" @tab-add="handleTabAdd"> </MainTabs>
+      <ConnectionDialog ref="connectionDialogRef" @login="handleLogin"></ConnectionDialog>
     </n-message-provider>
   </n-dialog-provider>
 </template>
@@ -11,9 +11,8 @@
 import { ref, useTemplateRef, onMounted } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 // import DynamicTabs from './components/DynamicTabs.vue';
-import Tabs from './components/Tabs.vue';
+import MainTabs from './components/MainTabs.vue';
 import ConnectionDialog from './components/ConnectionDialog.vue';
-import SessionDialog from './components/SessionDialog.vue';
 import { NDialogProvider, NMessageProvider } from 'naive-ui';
 
 const tabsRef = ref(null);
