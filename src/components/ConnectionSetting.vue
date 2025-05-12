@@ -16,7 +16,7 @@ import {
   NSelect,
   NGi,
 } from 'naive-ui';
-import { Folder, FolderOpenOutline, DesktopOutline, CaretDownOutline, EllipsisHorizontal } from '@vicons/ionicons5';
+import { Folder, FolderOpenOutline, DesktopOutline, EllipsisHorizontal } from '@vicons/ionicons5';
 import { ref, h, onMounted, toRaw } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -41,16 +41,7 @@ const connectionInfo = ref({
     theme: 'dracula',
   },
 });
-const groups = ref([
-  {
-    label: 'VPS',
-    value: 'VPS',
-  },
-  {
-    label: 'HOMELAB',
-    value: 'HOMELAB',
-  },
-]);
+const groups = ref([]);
 const terms = [
   {
     label: 'xterm-256color',
@@ -71,65 +62,92 @@ const themes = [
     value: 'solarized_light',
   },
 ];
-onMounted(async () => {
+
+const buildConnectionTree = async () => {
   let res = await window.configAPI.getAllConnConfigs();
-  let groupSet = new Set();
-  res.forEach((conn) => {
-    conn.key = conn.id;
-    conn.label = conn.name;
-    conn.prefix = () =>
-      h(NIcon, null, {
-        default: () => h(DesktopOutline),
-      });
-    conn.suffix = () =>
-      h(
-        NDropdown,
-        {
-          trigger: 'click',
-          options: [
-            { label: '编辑', key: 'edit' },
-            { label: '删除', key: 'delete' },
-          ],
-          onSelect: (key) => {
-            console.log('选中操作:', key);
-            if (key === 'edit') {
-              modalTitle.value = conn.name;
-              showEdit.value = true;
-              connectionInfo.value = conn;
-            } else if (key === 'delete') {
-              deleteConnection(conn.id, conn.name);
-            }
-          },
-        },
-        {
-          default: () =>
+
+  const grouped = res.reduce((acc, conn) => {
+    const groupName = conn.group || '未分组';
+    if (!acc[groupName]) {
+      acc[groupName] = [];
+    }
+    acc[groupName].push(conn);
+    return acc;
+  }, {});
+
+  groups.value = Object.keys(grouped).map((groupName) => {
+    return {
+      label: groupName,
+      value: groupName,
+    };
+  });
+
+  connections.value = Object.entries(grouped).map(([groupName, conns]) => {
+    return {
+      label: groupName,
+      key: groupName,
+      prefix: () =>
+        h(NIcon, null, {
+          default: () => h(FolderOpenOutline),
+        }),
+      children: conns.map((conn) => {
+        return {
+          ...conn,
+          label: conn.name,
+          key: conn.id,
+          prefix: () =>
+            h(NIcon, null, {
+              default: () => h(DesktopOutline),
+            }),
+          suffix: () =>
             h(
-              NButton,
+              NDropdown,
               {
-                text: true,
-                type: 'default',
-                size: 'small',
+                trigger: 'click',
+                options: [
+                  { label: '编辑', key: 'edit' },
+                  { label: '删除', key: 'delete' },
+                ],
+                onSelect: (key, event) => {
+                  console.log('选中操作:', key);
+                  if (key === 'edit') {
+                    modalTitle.value = conn.name;
+                    showEdit.value = true;
+                    connectionInfo.value = conn;
+                  } else if (key === 'delete') {
+                    deleteConnection(conn.id, conn.name);
+                  }
+                },
               },
               {
                 default: () =>
-                  h(NIcon, null, {
-                    default: () => h(EllipsisHorizontal),
-                  }),
+                  h(
+                    NButton,
+                    {
+                      text: true,
+                      type: 'default',
+                      size: 'small',
+                      onClick: (event) => {
+                        event.stopPropagation();
+                      },
+                    },
+                    {
+                      default: () =>
+                        h(NIcon, null, {
+                          default: () => h(EllipsisHorizontal),
+                        }),
+                    },
+                  ),
               },
             ),
-        },
-      );
-    if (conn.group) {
-      groupSet.add(conn.group);
-    }
-  });
-  groups.value = Array.from(groupSet).map((group) => {
-    return {
-      label: group,
-      value: group,
+        };
+      }),
     };
   });
-  connections.value = res;
+};
+
+onMounted(async () => {
+  await buildConnectionTree();
 });
 
 async function deleteConnection(id, name) {
@@ -140,12 +158,15 @@ async function deleteConnection(id, name) {
     negativeText: '不确定',
     draggable: true,
     onPositiveClick: () => {
-      window.configAPI.deleteConnConfig(id).then((res) => {
-        console.log(res);
-        const index = connections.value.findIndex((conn) => conn.id === id);
-        connections.value.splice(index, 1);
-        message.success('删除成功');
-      });
+      window.configAPI
+        .deleteConnConfig(id)
+        .then((res) => {
+          console.log(res);
+          return buildConnectionTree();
+        })
+        .then(() => {
+          message.success('删除成功');
+        });
     },
     onNegativeClick: () => {},
   });
@@ -204,13 +225,51 @@ const saveConnection = async (event) => {
       connectionInfo.value.options.port;
   }
 
-  window.configAPI.addOrUpdateConnConfig(toRaw(connectionInfo.value)).then((res) => {
-    if (res === 'add') {
-      connections.value.push(connectionInfo.value);
-    }
-    message.success('保存成功');
-    showEdit.value = false;
-  });
+  const rawConn = toRaw(connectionInfo.value);
+  delete rawConn.label;
+  delete rawConn.key;
+  delete rawConn.prefix;
+  delete rawConn.suffix;
+
+  window.configAPI
+    .addOrUpdateConnConfig(rawConn)
+    .then((res) => {
+      return buildConnectionTree();
+    })
+    .then(() => {
+      message.success('保存成功');
+      showEdit.value = false;
+    });
+};
+
+const updatePrefixWithExpaned = (_keys, _option, meta) => {
+  if (!meta.node) return;
+  switch (meta.action) {
+    case 'expand':
+      meta.node.prefix = () =>
+        h(NIcon, null, {
+          default: () => h(FolderOpenOutline),
+        });
+      break;
+    case 'collapse':
+      meta.node.prefix = () =>
+        h(NIcon, null, {
+          default: () => h(Folder),
+        });
+      break;
+  }
+};
+
+const nodeProps = ({ option }) => {
+  return {
+    onClick() {
+      if (!option.children && !option.disabled) {
+        modalTitle.value = option.name;
+        showEdit.value = true;
+        connectionInfo.value = option;
+      }
+    },
+  };
 };
 </script>
 
@@ -219,7 +278,14 @@ const saveConnection = async (event) => {
     <n-flex>
       <n-button type="primary" size="small" @click="openNewConnection">新增连接</n-button>
     </n-flex>
-    <n-tree block-line expand-on-click :data="connections"></n-tree>
+    <n-tree
+      block-line
+      expand-on-click
+      default-expand-all
+      :data="connections"
+      :node-props="nodeProps"
+      :on-update:expanded-keys="updatePrefixWithExpaned"
+    ></n-tree>
   </n-flex>
   <n-modal
     v-model:show="showEdit"
