@@ -1,8 +1,10 @@
 <template>
-  <div class="sftp-file">
-    <div class="tool-bar"><button>刷新</button><button>上传</button></div>
+  <n-flex vertical :size="[12, 2]" class="sftp-file">
+    <n-space :size="[4, 12]">
+      <n-button size="tiny" type="primary" @click="changePath(currentPath)"> 刷新 </n-button><n-button size="tiny" type="primary"> 上传 </n-button>
+    </n-space>
     <div class="path-bar">
-      <span v-for="path in splitPaths" :key="path.realPath" @click="changePath(path.realPath)">{{ path.path }}</span>
+      <span v-for="path in splitPaths" :key="path.realPath" @click="clickPath(path.realPath)">{{ path.path }}</span>
     </div>
     <div class="file-list" @dragover.prevent @drop.prevent="handleDropFiles">
       <table>
@@ -31,11 +33,21 @@
         </tbody>
       </table>
     </div>
-  </div>
+  </n-flex>
+  <n-modal
+    v-model:show="showPathModal"
+    style="width: 500px; position: fixed; top: 60px; left: 50%; transform: translateX(-50%)"
+  >
+    <n-input-group>
+      <n-input :style="{ width: '450px' }" size="small" v-model:value="pathModalPath" />
+      <n-button type="primary" size="small" @click="gotoPath(pathModalPath)"> 前往 </n-button>
+    </n-input-group>
+  </n-modal>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { NButton, NSpace, NFlex, NModal, NInputGroup, NInput, useMessage } from 'naive-ui';
 
 const props = defineProps({
   // 这个是连接配置的ID
@@ -66,6 +78,9 @@ const fileTypeIcon = {
 
 const currentPath = ref('');
 const currentID = ref(-1);
+const showPathModal = ref(false);
+const pathModalPath = ref('');
+const message = useMessage();
 
 const splitPaths = computed(() => {
   let paths = currentPath.value.split('/');
@@ -82,13 +97,39 @@ const splitPaths = computed(() => {
   return ret;
 });
 
-const changePath = (path) => {
+const clickPath = (path) => {
   if (path === currentPath.value) {
     console.log('当前路径，应该要打开路径输入页面');
+    pathModalPath.value = path;
+    showPathModal.value = true;
     return;
   }
-  console.log('changePath', path);
-  currentPath.value = path;
+  console.log('clickPath', path);
+  changePath(path);
+};
+
+const gotoPath = (path) => {
+  // 判断path是否以/结尾，如果不以/结尾，则加上/
+  if (!path.endsWith('/')) {
+    path = path + '/';
+  }
+  changePath(path, (status) => {
+    if (status === 'success') {
+      showPathModal.value = false;
+    }
+  });
+};
+
+const changePath = (path, callback) => {
+  readDir(path, (status) => {
+    if (status === 'success') {
+      currentPath.value = path;
+      callback && callback('success');
+    } else  {
+      message.error('无法进入该目录');
+      callback && callback('error');
+    }
+  });
 };
 
 const selected = (key, id) => {
@@ -103,7 +144,8 @@ const openFile = (key, row) => {
     return;
   }
   if (row.type === 'd') {
-    currentPath.value = currentPath.value + row.name + '/';
+    const path = currentPath.value + row.name + '/';
+    changePath(path);
   }
 };
 
@@ -146,9 +188,9 @@ const startResize = (e, index) => {
   window.addEventListener('mouseup', onMouseUp);
 };
 
-function readDir() {
+function readDir(path, callback) {
   window.sshAPI
-    .readDir(props.clientId, currentPath.value)
+    .readDir(props.clientId, path)
     .then((data) => {
       console.log(data);
       let files = data
@@ -177,9 +219,11 @@ function readDir() {
         });
       console.log(files);
       fileList.value = files;
+      callback && callback('success');
     })
     .catch((e) => {
       console.log(e);
+      callback && callback('error');
     });
 }
 
@@ -198,6 +242,7 @@ onMounted(async () => {
 
   const homeDir = await window.sshAPI.getHomeDir(props.clientId);
   currentPath.value = homeDir;
+  readDir(currentPath.value);
 });
 
 function formatTimestamp(timestamp) {
@@ -214,12 +259,6 @@ function formatTimestamp(timestamp) {
   // 拼接成所需格式
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
-
-watch(currentPath, (newVal, oldVal) => {
-  if (newVal) {
-    readDir();
-  }
-});
 
 const handleDropFiles = (event) => {
   const files = Array.from(event.dataTransfer.files);
@@ -242,8 +281,6 @@ const showContextMenu = (event, columnName, fileName) => {
 
 <style lang="less" scoped>
 .sftp-file {
-  display: flex;
-  flex-direction: column;
   height: 100%;
   font-size: 13px;
   overflow: hidden;
