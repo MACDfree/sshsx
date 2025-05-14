@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, Menu, shell, dialog, clipboard } from 'ele
 import path from 'node:path';
 import fs from 'node:fs';
 import started from 'electron-squirrel-startup';
-import { SSHClient } from './main-sshclients';
+import { SSHClient } from './sshclients';
 import Store from 'electron-store';
 import yaml from 'js-yaml';
 
