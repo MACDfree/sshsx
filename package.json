@@ -44,6 +44,7 @@
     "@xterm/addon-unicode11": "^0.8.0",
     "@xterm/addon-web-links": "^0.11.0",
     "@xterm/xterm": "^5.5.0",
+    "bytes": "^3.1.2",
     "electron-context-menu": "^4.0.4",
     "electron-squirrel-startup": "^1.0.1",
     "electron-store": "^10.0.0",

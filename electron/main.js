@@ -448,8 +448,9 @@ ipcMain.on('ssh:show-context-menu', (event, type, args) => {
             buttons: ['是', '否'],
           });
           if (response === 0) {
-            // TODO
+            mainWindow.webContents.send(`ssh:delete-file-listen-${args.clientID}`, 'start')
             await remove(args.clientID, args.remotePath);
+            mainWindow.webContents.send(`ssh:delete-file-listen-${args.clientID}`, 'end')
           }
         },
       },

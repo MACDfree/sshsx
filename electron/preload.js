@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('sshAPI', {
   showContextMenu: (type, args)=> ipcRenderer.send('ssh:show-context-menu', type, args),
   transferFileList: (clientID, callback)=>ipcRenderer.on(`ssh:transfer-file-list-${clientID}`, (event, transferType, data) => callback(transferType, data)),
   uploadFileProcess:  (clientID, callback)=>ipcRenderer.on(`ssh:upload-file-process-${clientID}`, (event, data) => callback(data)),
+  deleteFileListen: (clientID, callback)=>ipcRenderer.on(`ssh:delete-file-listen-${clientID}`, (event, data) => callback(data)),
 });
 
 contextBridge.exposeInMainWorld('configAPI', {

@@ -45,7 +45,7 @@
     </n-input-group>
   </n-modal>
   <n-modal v-model:show="showFileTransferModal" style="width: 600px">
-    <n-flex vertical :size="[0, 2]" style="padding: 10px 5px; background-color: #fff;">
+    <n-flex vertical :size="[0, 2]" style="padding: 10px 5px; background-color: #fff">
       <div>{{ fileTransferTitle }}</div>
       <n-table :bordered="false" size="small">
         <thead>
@@ -70,6 +70,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { NButton, NSpace, NFlex, NModal, NInputGroup, NInput, useMessage, NTable, NProgress } from 'naive-ui';
+import bytes from 'bytes';
 
 const props = defineProps({
   // 这个是连接配置的ID
@@ -223,7 +224,7 @@ function readDir(path, callback) {
           let f = {
             id: index,
             name: file.filename,
-            size: file.attrs.size,
+            size: bytes(file.attrs.size),
             changed: formatTimestamp(file.attrs.mtime * 1000),
           };
 
@@ -232,6 +233,10 @@ function readDir(path, callback) {
           f.rights = ss[0].slice(1);
           f.owner = ss[3];
           f.type = ss[0].slice(0, 1);
+
+          if (f.type === 'd') {
+            f.size = '';
+          }
 
           return f;
         })
@@ -342,6 +347,15 @@ const transferFileArray = computed(() => {
 
 window.sshAPI.uploadFileProcess(props.clientId, (processInfo) => {
   transferFileList.value[processInfo.path] = Math.floor(processInfo.process * 100);
+});
+
+window.sshAPI.deleteFileListen(props.clientId, (stat) => {
+  if (stat === 'start') {
+    // TODO
+  } else if (stat === 'end') {
+    message.success('删除成功');
+    changePath(currentPath.value);
+  }
 });
 </script>
 
