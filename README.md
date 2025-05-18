@@ -8,3 +8,13 @@ sshsx是一个ssh和sftp客户端工具，用于快速登录服务器。希望�
 2. sftp界面
 3. 设置页面
 4. 连接管理页面
+
+## 界面
+
+SSH界面
+
+![ssh](images/ssh.png)
+
+SFTP界面
+
+![sftp](images/sftp.png)
