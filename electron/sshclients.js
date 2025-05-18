@@ -1,5 +1,7 @@
 import { Client } from 'ssh2';
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { dir } from 'node:console';
 
 class SSHClient {
   sshStream;
@@ -111,7 +113,7 @@ class SSHClient {
         if (err) {
           reject(err);
           return;
-        };
+        }
 
         stream
           .on('close', (code, signal) => {
@@ -134,6 +136,7 @@ class SSHClient {
   }
 
   upload(localPath, remotePath) {
+    const self = this;
     return new Promise((resolve, reject) => {
       this.sftpClient.fastPut(
         localPath,
@@ -141,6 +144,10 @@ class SSHClient {
         {
           step: function (total_transferred, chunk, total) {
             console.log('uploaded', total_transferred / total);
+            self.win.webContents.send(`ssh:upload-file-process-${self.clientID}`, {
+              path: localPath,
+              process: total_transferred / total,
+            });
           },
         },
         (err) => {
@@ -172,19 +179,49 @@ class SSHClient {
     });
   }
 
-  mkdir(dirPath) {
-    return new Promise((resolve, reject) => {
-      this.sftpClient.mkdir(dirPath, (err) => {
+  async mkdir(dirPath) {
+    const sftpClient = this.sftpClient;
+    let found = false;
+    let basePaths = [];
+    let basePath = dirPath;
+    do {
+      basePath = basePath.substring(0, basePath.lastIndexOf('/'));
+      console.log('basePath', basePath);
+      if (basePath === '') {
+        break;
+      }
+      found = await this.stat(basePath);
+      console.log('found', found);
+      if (!found) {
+        basePaths.push(basePath);
+      }
+    } while (!found);
+
+    for (let i = basePaths.length - 1; i >= 0; i--) {
+      await new Promise((resolve, reject) => {
+        sftpClient.mkdir(basePaths[i], (err) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
+    }
+
+    await new Promise((resolve, reject) => {
+      sftpClient.mkdir(dirPath, (err) => {
         if (err) {
           reject(err);
-          return;
+        } else {
+          resolve();
         }
-        resolve();
       });
     });
   }
 
   download(remotePath, localPath) {
+    const self = this;
     return new Promise((resolve, reject) => {
       this.sftpClient.fastGet(
         remotePath,
@@ -192,6 +229,10 @@ class SSHClient {
         {
           step: function (total_transferred, chunk, total) {
             console.log('download', total_transferred / total);
+            self.win.webContents.send(`ssh:upload-file-process-${self.clientID}`, {
+              path: remotePath,
+              process: total_transferred / total,
+            });
           },
         },
         (err) => {
@@ -203,6 +244,44 @@ class SSHClient {
         },
       );
     });
+  }
+
+  async remove(remotePath) {
+    const sftpClient = this.sftpClient;
+    const st = await this.stat(remotePath);
+    if (!st) {
+      return;
+    }
+    const fileType = st.mode >>> 12;
+    if (fileType === 8) {
+      // 普通文件
+      await new Promise((resolve, reject) => {
+        sftpClient.unlink(remotePath, (err) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve();
+        });
+      });
+    } else if (fileType === 4) {
+      // 目录
+      const files = await this.readDir(remotePath);
+      for (const file of files) {
+        console.log('delete', file.filename);
+        await this.remove(remotePath + '/' + file.filename);
+      }
+
+      await new Promise((resolve, reject) => {
+        sftpClient.rmdir(remotePath, (err) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          resolve();
+        });
+      });
+    }
   }
 }
 

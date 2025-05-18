@@ -203,6 +203,7 @@ ipcMain.handle('ssh:upload-files', async (_, clientID, filePaths, remotePath) =>
     if (isDir) {
       const uploadFileList = await getAllFilePaths(filePath);
       console.log('uploadFileList', uploadFileList);
+      mainWindow.webContents.send(`ssh:transfer-file-list-${clientID}`, 'upload', uploadFileList)
       for (const j in uploadFileList) {
         const uploadFilePath = uploadFileList[j];
         const relativePath = path.relative(filePath, uploadFilePath.replace(/\|\|aaisdirbb$/, ''));
@@ -227,6 +228,7 @@ ipcMain.handle('ssh:upload-files', async (_, clientID, filePaths, remotePath) =>
         }
       }
     } else {
+      mainWindow.webContents.send(`ssh:transfer-file-list-${clientID}`, 'upload', [filePath])
       const stat = await sshClient.stat(path.join(remotePath, basename).replaceAll('\\', '/'));
       console.log(stat);
       if (stat) {
@@ -371,12 +373,14 @@ async function download(clientID, remotePath, localPath) {
   if (fileType === 8) {
     // 普通文件
     console.log('file');
+    mainWindow.webContents.send(`ssh:transfer-file-list-${clientID}`, 'download', [remotePath])
     await sshClient.download(remotePath, path.join(localPath, basename));
   } else if (fileType === 4) {
     // 目录
     console.log('dir');
     const remoteFilePaths = await getAllRemoteFilePaths(sshClient, remotePath);
     console.log(remoteFilePaths);
+    mainWindow.webContents.send(`ssh:transfer-file-list-${clientID}`, 'download', remoteFilePaths)
     for (const remoteFilePath of remoteFilePaths) {
       const relativePath = path.relative(remotePath, remoteFilePath);
       console.log('relativePath', relativePath);
@@ -402,6 +406,18 @@ async function download(clientID, remotePath, localPath) {
   } else {
     return;
   }
+}
+
+async function remove(clientID, remotePath) {
+  const sshClient = sshClients[clientID];
+  if (!sshClient) {
+    return;
+  }
+  if (!sshClient.isConnected) {
+    delete sshClients[clientID];
+    return;
+  }
+  await sshClient.remove(remotePath);
 }
 
 ipcMain.on('ssh:show-context-menu', (event, type, args) => {
@@ -433,7 +449,7 @@ ipcMain.on('ssh:show-context-menu', (event, type, args) => {
           });
           if (response === 0) {
             // TODO
-            //await remove(args.clientID, args.remotePath);
+            await remove(args.clientID, args.remotePath);
           }
         },
       },
@@ -576,4 +592,8 @@ ipcMain.handle('dialog:confirm', async (event, message) => {
     buttons: ['确定', '取消'],
     cancelId: 1,
   });
+});
+
+ipcMain.handle('dialog:showOpenDialog', async (event, options) => {
+  return await dialog.showOpenDialog(mainWindow, options);
 });

@@ -1,7 +1,8 @@
 <template>
   <n-flex vertical :size="[12, 2]" class="sftp-file">
     <n-space :size="[4, 12]">
-      <n-button size="tiny" type="primary" @click="changePath(currentPath)"> 刷新 </n-button><n-button size="tiny" type="primary"> 上传 </n-button>
+      <n-button size="tiny" type="primary" @click="changePath(currentPath)"> 刷新 </n-button
+      ><n-button size="tiny" type="primary" @click="openFileDialog()"> 上传 </n-button>
     </n-space>
     <div class="path-bar">
       <span v-for="path in splitPaths" :key="path.realPath" @click="clickPath(path.realPath)">{{ path.path }}</span>
@@ -38,16 +39,37 @@
     v-model:show="showPathModal"
     style="width: 500px; position: fixed; top: 60px; left: 50%; transform: translateX(-50%)"
   >
-    <n-input-group>
+    <n-input-group style="background-color: #fff; padding: 5px">
       <n-input :style="{ width: '450px' }" size="small" v-model:value="pathModalPath" />
       <n-button type="primary" size="small" @click="gotoPath(pathModalPath)"> 前往 </n-button>
     </n-input-group>
+  </n-modal>
+  <n-modal v-model:show="showFileTransferModal" style="width: 600px">
+    <n-flex vertical :size="[0, 2]" style="padding: 10px 5px; background-color: #fff;">
+      <div>{{ fileTransferTitle }}</div>
+      <n-table :bordered="false" size="small">
+        <thead>
+          <tr>
+            <th style="width: 70%">文件名称</th>
+            <th style="width: 30%">进度</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="fileInfo in transferFileArray" :key="fileInfo.path">
+            <td>{{ fileInfo.path }}</td>
+            <td>
+              <n-progress type="line" status="success" :percentage="fileInfo.process" indicator-placement="inside" />
+            </td>
+          </tr>
+        </tbody>
+      </n-table>
+    </n-flex>
   </n-modal>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { NButton, NSpace, NFlex, NModal, NInputGroup, NInput, useMessage } from 'naive-ui';
+import { NButton, NSpace, NFlex, NModal, NInputGroup, NInput, useMessage, NTable, NProgress } from 'naive-ui';
 
 const props = defineProps({
   // 这个是连接配置的ID
@@ -80,6 +102,9 @@ const currentPath = ref('');
 const currentID = ref(-1);
 const showPathModal = ref(false);
 const pathModalPath = ref('');
+const showFileTransferModal = ref(false);
+const fileTransferTitle = ref('');
+const transferFileList = ref({});
 const message = useMessage();
 
 const splitPaths = computed(() => {
@@ -125,7 +150,7 @@ const changePath = (path, callback) => {
     if (status === 'success') {
       currentPath.value = path;
       callback && callback('success');
-    } else  {
+    } else {
       message.error('无法进入该目录');
       callback && callback('error');
     }
@@ -268,6 +293,7 @@ const handleDropFiles = (event) => {
   console.log(filePaths);
   window.sshAPI.uploadFiles(props.clientId, filePaths, currentPath.value).then((ret) => {
     console.log(ret);
+    changePath(currentPath.value);
   });
 };
 
@@ -277,6 +303,46 @@ const showContextMenu = (event, columnName, fileName) => {
   }
   window.sshAPI.showContextMenu('sftp', { clientID: props.clientId, remotePath: currentPath.value + fileName });
 };
+
+const openFileDialog = async () => {
+  const { filePaths, canceled } = await window.dialogAPI.showOpenDialog({
+    title: '选择上传文件',
+    buttonLabel: '选择文件',
+    properties: ['openFile', 'multiSelections'],
+  });
+  if (canceled) {
+    return;
+  }
+  console.log(filePaths);
+  window.sshAPI.uploadFiles(props.clientId, filePaths, currentPath.value).then((ret) => {
+    console.log(ret);
+    changePath(currentPath.value);
+  });
+};
+
+window.sshAPI.transferFileList(props.clientId, (transferType, fileList) => {
+  console.log(transferType, fileList);
+  transferFileList.value = fileList.reduce((acc, filePath) => {
+    acc[filePath] = 0;
+    return acc;
+  }, {});
+  if (transferType === 'download') {
+    fileTransferTitle.value = '下载';
+  } else if (transferType === 'upload') {
+    fileTransferTitle.value = '上传';
+  }
+  showFileTransferModal.value = true;
+});
+
+const transferFileArray = computed(() => {
+  return Object.entries(transferFileList.value).map(([path, process]) => {
+    return { path: path, process: process };
+  });
+});
+
+window.sshAPI.uploadFileProcess(props.clientId, (processInfo) => {
+  transferFileList.value[processInfo.path] = Math.floor(processInfo.process * 100);
+});
 </script>
 
 <style lang="less" scoped>

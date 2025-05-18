@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld('sshAPI', {
     return webUtils.getPathForFile(file);
   },
   showContextMenu: (type, args)=> ipcRenderer.send('ssh:show-context-menu', type, args),
+  transferFileList: (clientID, callback)=>ipcRenderer.on(`ssh:transfer-file-list-${clientID}`, (event, transferType, data) => callback(transferType, data)),
+  uploadFileProcess:  (clientID, callback)=>ipcRenderer.on(`ssh:upload-file-process-${clientID}`, (event, data) => callback(data)),
 });
 
 contextBridge.exposeInMainWorld('configAPI', {
@@ -31,4 +33,5 @@ contextBridge.exposeInMainWorld('configAPI', {
 contextBridge.exposeInMainWorld('dialogAPI', {
   info: (message) => ipcRenderer.invoke('dialog:info', message),
   confirm: (message) => ipcRenderer.invoke('dialog:confirm', message),
+  showOpenDialog: (options) => ipcRenderer.invoke('dialog:showOpenDialog', options),
 });
