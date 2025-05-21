@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('configAPI', {
   getConnConfig: (connID) => ipcRenderer.invoke('config:get-conn-config', connID),
   addOrUpdateConnConfig: (config) => ipcRenderer.invoke('config:add-or-update-conn-config', config),
   deleteConnConfig: (connID) => ipcRenderer.invoke('config:delete-conn-config', connID),
+  getEditorConfigs: () => ipcRenderer.invoke('config:get-editor-configs'),
+  saveEditorConfigs: (configs) => ipcRenderer.invoke('config:save-editor-configs', configs),
 });
 
 contextBridge.exposeInMainWorld('dialogAPI', {

@@ -33,13 +33,22 @@ const handleTabAdd = () => {
 
 const handleLogin = (connId, name, type) => {
   tabsRef.value.addTabFunc({
-    id: uuidv4(),
+    id: sessionID(),
     title: name,
     type: type,
     connId: connId,
     closable: true,
   });
 };
+
+function sessionID() {
+  const timestamp  = Date.now();
+  const str = timestamp.toString();
+  if (str.length < 8) {
+    throw new Error("时间戳太短，无法提取6位");
+  }
+  return str.substring(str.length-8, str.length-2);
+}
 </script>
 
 <style lang="less" scoped></style>

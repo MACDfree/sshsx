@@ -25,7 +25,7 @@
               :class="{ [col.key]: true, selected: currentID === row.id }"
               @click="selected(col.key, row.id)"
               @dblclick="openFile(col.key, row)"
-              @contextmenu.prevent="showContextMenu($event, col.key, row.name)"
+              @contextmenu.prevent="showContextMenu($event, col.key, row.name, row.type)"
             >
               <span v-if="col.key === 'name'">{{ fileTypeIcon[row['type']] }}</span>
               {{ row[col.key] }}
@@ -302,11 +302,11 @@ const handleDropFiles = (event) => {
   });
 };
 
-const showContextMenu = (event, columnName, fileName) => {
+const showContextMenu = (event, columnName, fileName, fileType) => {
   if (columnName !== 'name') {
     return;
   }
-  window.sshAPI.showContextMenu('sftp', { clientID: props.clientId, remotePath: currentPath.value + fileName });
+  window.sshAPI.showContextMenu('sftp', { clientID: props.clientId, remotePath: currentPath.value + fileName, fileType: fileType });
 };
 
 const openFileDialog = async () => {

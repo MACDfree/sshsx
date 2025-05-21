@@ -5,6 +5,9 @@ import started from 'electron-squirrel-startup';
 import { SSHClient } from './sshclients';
 import Store from 'electron-store';
 import yaml from 'js-yaml';
+import os from 'os';
+import chokidar from 'chokidar';
+import execFile from 'node:child_process';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -186,7 +189,7 @@ ipcMain.handle('ssh:get-home-dir', async (_, clientID) => {
   return sshClient.getHomeDir();
 });
 
-ipcMain.handle('ssh:upload-files', async (_, clientID, filePaths, remotePath) => {
+async function uploadFiles(clientID, filePaths, remotePath) {
   const sshClient = sshClients[clientID];
   if (!sshClient) {
     return;
@@ -203,7 +206,7 @@ ipcMain.handle('ssh:upload-files', async (_, clientID, filePaths, remotePath) =>
     if (isDir) {
       const uploadFileList = await getAllFilePaths(filePath);
       console.log('uploadFileList', uploadFileList);
-      mainWindow.webContents.send(`ssh:transfer-file-list-${clientID}`, 'upload', uploadFileList)
+      mainWindow.webContents.send(`ssh:transfer-file-list-${clientID}`, 'upload', uploadFileList);
       for (const j in uploadFileList) {
         const uploadFilePath = uploadFileList[j];
         const relativePath = path.relative(filePath, uploadFilePath.replace(/\|\|aaisdirbb$/, ''));
@@ -228,7 +231,7 @@ ipcMain.handle('ssh:upload-files', async (_, clientID, filePaths, remotePath) =>
         }
       }
     } else {
-      mainWindow.webContents.send(`ssh:transfer-file-list-${clientID}`, 'upload', [filePath])
+      mainWindow.webContents.send(`ssh:transfer-file-list-${clientID}`, 'upload', [filePath]);
       const stat = await sshClient.stat(path.join(remotePath, basename).replaceAll('\\', '/'));
       console.log(stat);
       if (stat) {
@@ -238,7 +241,10 @@ ipcMain.handle('ssh:upload-files', async (_, clientID, filePaths, remotePath) =>
       await sshClient.upload(filePath, path.join(remotePath, basename).replaceAll('\\', '/'));
     }
   }
+}
 
+ipcMain.handle('ssh:upload-files', async (_, clientID, filePaths, remotePath) => {
+  await uploadFiles(clientID, filePaths, remotePath);
   return 'success';
 });
 
@@ -373,14 +379,14 @@ async function download(clientID, remotePath, localPath) {
   if (fileType === 8) {
     // 普通文件
     console.log('file');
-    mainWindow.webContents.send(`ssh:transfer-file-list-${clientID}`, 'download', [remotePath])
+    mainWindow.webContents.send(`ssh:transfer-file-list-${clientID}`, 'download', [remotePath]);
     await sshClient.download(remotePath, path.join(localPath, basename));
   } else if (fileType === 4) {
     // 目录
     console.log('dir');
     const remoteFilePaths = await getAllRemoteFilePaths(sshClient, remotePath);
     console.log(remoteFilePaths);
-    mainWindow.webContents.send(`ssh:transfer-file-list-${clientID}`, 'download', remoteFilePaths)
+    mainWindow.webContents.send(`ssh:transfer-file-list-${clientID}`, 'download', remoteFilePaths);
     for (const remoteFilePath of remoteFilePaths) {
       const relativePath = path.relative(remotePath, remoteFilePath);
       console.log('relativePath', relativePath);
@@ -423,57 +429,122 @@ async function remove(clientID, remotePath) {
 ipcMain.on('ssh:show-context-menu', (event, type, args) => {
   let template;
   if (type === 'sftp') {
-    template = [
-      {
-        label: '下载',
-        click: async () => {
-          const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
-            properties: ['openDirectory'],
-          });
-          if (canceled) {
-            console.log('Dialog was canceled');
-            return;
-          }
-          const localPath = filePaths[0];
-          console.log(localPath);
-          await download(args.clientID, args.remotePath, localPath);
+    template = [];
+    const editors = configStore.get('editors') ?? [];
+    if (args.fileType === '-' && editors.length > 0) {
+      const subMenu = editors.map((editor) => {
+        return {
+          label: editor.name,
+          click: async () => {
+            console.log(editor.path, args.remotePath, args.clientID);
+            // 先下载到临时文件夹
+            const tmpDir = os.tmpdir();
+            console.log(tmpDir);
+            const rootPath = path.join(tmpDir, 'sshsx-' + args.clientID);
+            console.log('rootPath:', rootPath);
+            const tmpPath = path.join(rootPath, args.remotePath);
+            console.log('tmpPath:', tmpPath);
+            const dirPath = path.dirname(tmpPath);
+            console.log('dirPath:', dirPath);
+            if (!fs.existsSync(rootPath)) {
+              // 创建文件夹，并增加监听
+              await mkdir(rootPath);
+              const watcher = chokidar.watch(rootPath, {
+                persistent: true,
+                recursive: true, // 是否递归监听子目录
+              });
+              watcher.on('change', (filePath) => {
+                console.log('change', filePath);
+                // 使用正则截取路径
+                const match = filePath.match(/sshsx-(\d+)\\(.*)/);
+                if (match) {
+                  const clientID = match[1];
+                  const remotePath = '/' + match[2].replaceAll('\\', '/');
+                  console.log('clientID:', clientID);
+                  console.log('remotePath:', remotePath);
+                  const remoteDirPath = path.dirname(remotePath);
+                  console.log('remoteDirPath:', remoteDirPath);
+                  uploadFiles(clientID, [filePath], remoteDirPath);
+                }
+              });
+            }
+            if (!fs.existsSync(dirPath)) {
+              await mkdir(dirPath);
+            }
+
+            await download(args.clientID, args.remotePath, dirPath);
+            // 最后用编辑器打开
+            execFile.execFile(editor.path, [tmpPath], (error, stdout, stderr) => {
+              if (error) {
+                console.error('执行出错:', error);
+                return;
+              }
+              if (stderr) {
+                console.error('错误输出:', stderr);
+              }
+              console.log('标准输出:', stdout);
+            });
+          },
+        };
+      });
+      template.push({
+        label: '编辑',
+        submenu: subMenu,
+      });
+    }
+    template.push(
+      ...[
+        {
+          label: '下载',
+          click: async () => {
+            const { filePaths, canceled } = await dialog.showOpenDialog(mainWindow, {
+              properties: ['openDirectory'],
+            });
+            if (canceled) {
+              console.log('Dialog was canceled');
+              return;
+            }
+            const localPath = filePaths[0];
+            console.log(localPath);
+            await download(args.clientID, args.remotePath, localPath);
+          },
         },
-      },
-      {
-        label: '删除',
-        click: async () => {
-          const { response } = await dialog.showMessageBox(mainWindow, {
-            message: `是否删除${args.remotePath}？`,
-            type: 'warning',
-            buttons: ['是', '否'],
-          });
-          if (response === 0) {
-            mainWindow.webContents.send(`ssh:delete-file-listen-${args.clientID}`, 'start')
-            await remove(args.clientID, args.remotePath);
-            mainWindow.webContents.send(`ssh:delete-file-listen-${args.clientID}`, 'end')
-          }
+        {
+          label: '删除',
+          click: async () => {
+            const { response } = await dialog.showMessageBox(mainWindow, {
+              message: `是否删除${args.remotePath}？`,
+              type: 'warning',
+              buttons: ['是', '否'],
+            });
+            if (response === 0) {
+              mainWindow.webContents.send(`ssh:delete-file-listen-${args.clientID}`, 'start');
+              await remove(args.clientID, args.remotePath);
+              mainWindow.webContents.send(`ssh:delete-file-listen-${args.clientID}`, 'end');
+            }
+          },
         },
-      },
-      {
-        label: '复制路径',
-        click: () => {
-          clipboard.writeText(args.remotePath);
+        {
+          label: '复制路径',
+          click: () => {
+            clipboard.writeText(args.remotePath);
+          },
         },
-      },
-      {
-        label: '复制文件名',
-        click: () => {
-          const fileName = path.basename(args.remotePath);
-          clipboard.writeText(fileName);
+        {
+          label: '复制文件名',
+          click: () => {
+            const fileName = path.basename(args.remotePath);
+            clipboard.writeText(fileName);
+          },
         },
-      },
-      {
-        label: '创建文件夹',
-        click: () => {
-          // TODO
+        {
+          label: '创建文件夹',
+          click: () => {
+            // TODO
+          },
         },
-      },
-    ];
+      ],
+    );
   } else if (type === 'ssh') {
     template = [
       {
@@ -578,6 +649,18 @@ ipcMain.handle('config:delete-conn-config', async (event, connID) => {
   });
 });
 
+ipcMain.handle('config:get-editor-configs', async (event) => {
+  return new Promise((resolve, reject) => {
+    resolve(configStore.get('editors') ?? []);
+  });
+});
+
+ipcMain.handle('config:save-editor-configs', async (event, editorConfig) => {
+  return new Promise((resolve, reject) => {
+    configStore.set('editors', editorConfig);
+    resolve('save');
+  });
+});
 
 ipcMain.handle('dialog:info', async (event, message) => {
   return await dialog.showMessageBox(mainWindow, {
