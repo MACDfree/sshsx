@@ -1,5 +1,6 @@
 <template>
   <n-tabs
+    class="main-tabs"
     ref="tabsRef"
     v-model:value="currentTab"
     type="card"
@@ -39,11 +40,15 @@
       <Settings v-else-if="tab.type === 'settings'"></Settings>
     </n-tab-pane>
     <template #suffix>
+      <div
+        style="min-width: 100px; height: 100%; flex: 1 0 1%; -webkit-app-region: drag; background-color: aliceblue"
+      ></div>
       <n-button strong secondary circle size="small" @click="openSettingsTab">
         <template #icon>
           <n-icon><SettingsOutline /></n-icon>
         </template>
       </n-button>
+      <div style="width: 145px; height: 100%"></div>
     </template>
   </n-tabs>
 </template>
@@ -118,4 +123,8 @@ const openSettingsTab = () => {
 };
 </script>
 
-<style lang="less" scoped></style>
+<style lang="less">
+// .main-tabs .n-tabs-nav__suffix {
+//   flex: 1 0 auto;
+// }
+</style>
