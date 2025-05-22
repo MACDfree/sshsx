@@ -1,6 +1,6 @@
 <template>
   <n-flex vertical :size="[12, 2]" class="sftp-file">
-    <n-space :size="[4, 12]">
+    <n-space :size="[4, 12]" class="button-bar">
       <n-button size="tiny" type="primary" @click="changePath(currentPath)"> 刷新 </n-button
       ><n-button size="tiny" type="primary" @click="openFileDialog()"> 上传 </n-button>
     </n-space>
@@ -402,22 +402,26 @@ window.sshAPI.deleteFileListen(props.clientId, (stat) => {
   height: 100%;
   font-size: 13px;
   overflow: hidden;
+  .button-bar {
+    padding: 2px 5px;
+  }
 }
 .path-bar {
   display: inline-flex;
   flex-direction: row-reverse;
   justify-content: flex-end;
-  padding: 5px 3px;
+  padding: 1px 10px;
   color: #000;
   background-color: #99b4d1;
+  font-size: 15px;
   & > span {
     cursor: default;
   }
   & > span:hover {
-    color: #666;
+    color: #777;
   }
   & > span:hover ~ span {
-    color: #666;
+    color: #777;
   }
 }
 .file-list {
