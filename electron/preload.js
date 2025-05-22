@@ -38,3 +38,7 @@ contextBridge.exposeInMainWorld('dialogAPI', {
   confirm: (message) => ipcRenderer.invoke('dialog:confirm', message),
   showOpenDialog: (options) => ipcRenderer.invoke('dialog:showOpenDialog', options),
 });
+
+contextBridge.exposeInMainWorld('clipboardAPI', {
+  getFilePath: () => ipcRenderer.invoke('clipboard:get-file-path'),
+});

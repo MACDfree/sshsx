@@ -689,3 +689,7 @@ ipcMain.handle('dialog:confirm', async (event, message) => {
 ipcMain.handle('dialog:showOpenDialog', async (event, options) => {
   return await dialog.showOpenDialog(mainWindow, options);
 });
+
+ipcMain.handle('clipboard:get-file-path', (event) => {
+  return clipboard.readBuffer('FileNameW').toString('ucs2').replace(RegExp(String.fromCharCode(0), 'g'), '');
+});

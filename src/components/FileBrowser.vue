@@ -7,7 +7,7 @@
     <div class="path-bar">
       <span v-for="path in splitPaths" :key="path.realPath" @click="clickPath(path.realPath)">{{ path.path }}</span>
     </div>
-    <div class="file-list" @dragover.prevent @drop.prevent="handleDropFiles">
+    <div class="file-list" @dragover.prevent @drop.prevent="handleDropFiles" @paste="handlePaste">
       <table>
         <thead>
           <tr>
@@ -69,7 +69,18 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { NButton, NSpace, NFlex, NModal, NInputGroup, NInput, useMessage, NTable, NProgress } from 'naive-ui';
+import {
+  NButton,
+  NSpace,
+  NFlex,
+  NModal,
+  NInputGroup,
+  NInput,
+  useMessage,
+  NTable,
+  NProgress,
+  useDialog,
+} from 'naive-ui';
 import bytes from 'bytes';
 
 const props = defineProps({
@@ -107,6 +118,7 @@ const showFileTransferModal = ref(false);
 const fileTransferTitle = ref('');
 const transferFileList = ref({});
 const message = useMessage();
+const dialog = useDialog();
 
 const splitPaths = computed(() => {
   let paths = currentPath.value.split('/');
@@ -306,7 +318,11 @@ const showContextMenu = (event, columnName, fileName, fileType) => {
   if (columnName !== 'name') {
     return;
   }
-  window.sshAPI.showContextMenu('sftp', { clientID: props.clientId, remotePath: currentPath.value + fileName, fileType: fileType });
+  window.sshAPI.showContextMenu('sftp', {
+    clientID: props.clientId,
+    remotePath: currentPath.value + fileName,
+    fileType: fileType,
+  });
 };
 
 const openFileDialog = async () => {
@@ -344,6 +360,28 @@ const transferFileArray = computed(() => {
     return { path: path, process: process };
   });
 });
+
+const handlePaste = async (event) => {
+  const copyFilePath = await window.clipboardAPI.getFilePath();
+  console.log(copyFilePath);
+  if (!copyFilePath) {
+    return;
+  }
+  dialog.warning({
+    title: '确认',
+    content: `上传“${copyFilePath}”？`,
+    positiveText: '确定',
+    negativeText: '不确定',
+    draggable: true,
+    onPositiveClick: () => {
+      window.sshAPI.uploadFiles(props.clientId, [copyFilePath], currentPath.value).then((ret) => {
+        console.log(ret);
+        changePath(currentPath.value);
+      });
+    },
+    onNegativeClick: () => {},
+  });
+};
 
 window.sshAPI.uploadFileProcess(props.clientId, (processInfo) => {
   transferFileList.value[processInfo.path] = Math.floor(processInfo.process * 100);
