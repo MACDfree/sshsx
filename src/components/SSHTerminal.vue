@@ -217,6 +217,7 @@ const showContextMenu = (event) => {
   height: 100%;
   overflow-y: hidden;
   overflow-x: hidden;
+  padding: 5px 6px 3px 6px;
   .terminal {
     height: 100%;
   }

@@ -40,9 +40,7 @@
       <Settings v-else-if="tab.type === 'settings'"></Settings>
     </n-tab-pane>
     <template #suffix>
-      <div
-        style="min-width: 100px; height: 100%; flex: 1 0 1%; -webkit-app-region: drag; background-color: aliceblue"
-      ></div>
+      <div class="tab-drag-area"></div>
       <n-button strong secondary circle size="small" @click="openSettingsTab">
         <template #icon>
           <n-icon><SettingsOutline /></n-icon>
@@ -124,7 +122,15 @@ const openSettingsTab = () => {
 </script>
 
 <style lang="less">
-// .main-tabs .n-tabs-nav__suffix {
-//   flex: 1 0 auto;
-// }
+.main-tabs .n-tabs-pad {
+  -webkit-app-region: drag;
+}
+.main-tabs .n-tabs-nav__suffix .tab-drag-area {
+  -webkit-app-region: drag;
+  min-width: 100px;
+  height: 100%;
+}
+.n-tabs.main-tabs .n-tabs-nav__suffix {
+  padding-left: 0;
+}
 </style>
