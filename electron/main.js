@@ -670,6 +670,12 @@ ipcMain.handle('config:save-editor-configs', async (event, editorConfig) => {
   });
 });
 
+ipcMain.handle('config:get-config-path-from-store', (event) => {
+  return new Promise((resolve, reject) => {
+    resolve(store.get('configFilePath'));
+  });
+});
+
 ipcMain.handle('dialog:info', async (event, message) => {
   return await dialog.showMessageBox(mainWindow, {
     type: 'info',
