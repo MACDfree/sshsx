@@ -14,6 +14,7 @@ import _ from 'lodash';
 // import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { SearchAddon } from '@xterm/addon-search';
+import { WebglAddon } from '@xterm/addon-webgl';
 
 const props = defineProps({
   // 这个是连接配置的ID
@@ -134,8 +135,10 @@ onMounted(async () => {
   terminal.unicode.activeVersion = '11';
   searchAddon = new SearchAddon();
   terminal.loadAddon(searchAddon);
+
   //searchAddon.findNext('foo');
   terminal.open(terminalDiv.value);
+  terminal.loadAddon(new WebglAddon());
   terminal.focus();
   fitAddon.fit();
 

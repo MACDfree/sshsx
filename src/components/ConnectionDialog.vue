@@ -159,5 +159,6 @@ function loginSFTP(event, connectionID, title) {
   top: 20px;
   left: 50%;
   transform: translateX(-50%);
+  overflow: auto;
 }
 </style>
