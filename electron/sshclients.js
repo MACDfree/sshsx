@@ -35,44 +35,42 @@ class SSHClient {
     });
   }
 
-  connectShell(termConfig) {
-    return this.connect().then(() => {
-      return new Promise((resolve, reject) => {
-        this.sshClient.shell(termConfig, (err, stream) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-          this.sshStream = stream;
-          stream
-            .on('data', (data) => {
-              this.win.webContents.send(`ssh:receive-${this.clientID}`, data.toString());
-            })
-            .on('close', () => {
-              this.sshClient.end();
-              this.isConnected = false;
-              this.win.webContents.send(`ssh:close-${this.clientID}`);
-            });
-          stream.stderr.on('data', (data) => {
+  async connectShell(termConfig) {
+    await this.connect();
+    return await new Promise((resolve, reject) => {
+      this.sshClient.shell(termConfig, (err, stream) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        this.sshStream = stream;
+        stream
+          .on('data', (data) => {
             this.win.webContents.send(`ssh:receive-${this.clientID}`, data.toString());
+          })
+          .on('close', () => {
+            this.sshClient.end();
+            this.isConnected = false;
+            this.win.webContents.send(`ssh:close-${this.clientID}`);
           });
-          resolve('shell connected');
+        stream.stderr.on('data', (data_1) => {
+          this.win.webContents.send(`ssh:receive-${this.clientID}`, data_1.toString());
         });
+        resolve('shell connected');
       });
     });
   }
 
-  connectSFTP() {
-    return this.connect().then(() => {
-      return new Promise((resolve, reject) => {
-        this.sshClient.sftp((err, sftp) => {
-          if (err) {
-            reject(err);
-            return;
-          }
-          this.sftpClient = sftp;
-          resolve('sftp connected');
-        });
+  async connectSFTP() {
+    await this.connect();
+    return await new Promise((resolve, reject) => {
+      this.sshClient.sftp((err, sftp) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        this.sftpClient = sftp;
+        resolve('sftp connected');
       });
     });
   }
