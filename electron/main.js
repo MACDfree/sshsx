@@ -8,6 +8,7 @@ import yaml from 'js-yaml';
 import os from 'os';
 import chokidar from 'chokidar';
 import execFile from 'node:child_process';
+import { addSession, clearSession, getSession } from './sessions';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -111,62 +112,45 @@ app.on('window-all-closed', () => {
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
 
-let sshClients = {};
-
 ipcMain.handle('ssh:connect-shell', async (_, clientID, connConfig, termConfig) => {
   console.log('ssh:connect-shell', clientID);
-  let sshClient = sshClients[clientID];
-  if (!sshClient) {
-    sshClient = new SSHClient(clientID, mainWindow, connConfig);
-    sshClients[clientID] = sshClient;
+  let session = await getSession(clientID);
+  if (!session) {
+    const sshClient = new SSHClient(clientID, mainWindow, connConfig);
+    session = addSession(clientID, sshClient);
   }
-  return sshClient.connectShell(termConfig);
+  console.log('ssh:connect-shell', session);
+  return session.sshClient.connectShell(termConfig);
 });
 
 ipcMain.handle('ssh:connect-sftp', async (_, clientID, connConfig) => {
   console.log('ssh:connect-sftp', clientID);
-  let sshClient = sshClients[clientID];
-  if (!sshClient) {
-    sshClient = new SSHClient(clientID, mainWindow, connConfig);
-    sshClients[clientID] = sshClient;
+  let session = await getSession(clientID);
+  if (!session) {
+    const sshClient = new SSHClient(clientID, mainWindow, connConfig);
+    session = addSession(clientID, sshClient);
   }
-  return sshClient.connectSFTP();
+  return session.sshClient.connectSFTP();
 });
 
-ipcMain.on('ssh:disconnect', (event, clientID) => {
-  const sshClient = sshClients[clientID];
-  if (!sshClient) {
-    return;
-  }
-  if (!sshClient.isConnected) {
-    delete sshClients[clientID];
-    return;
-  }
-  sshClient.disconnect();
+ipcMain.on('ssh:disconnect', async (event, clientID) => {
+  await clearSession(clientID);
 });
 
-ipcMain.on('ssh:set-window', (event, clientID, config) => {
-  const sshClient = sshClients[clientID];
-  if (!sshClient) {
+ipcMain.on('ssh:set-window', async (event, clientID, config) => {
+  const session = await getSession(clientID);
+  if (!session) {
     return;
   }
-  if (!sshClient.isConnected) {
-    delete sshClients[clientID];
-    return;
-  }
-  sshClient.setWindow(config.rows, config.cols);
+  session.sshClient.setWindow(config.rows, config.cols);
 });
 
-ipcMain.on('ssh:send', (event, clientID, data) => {
-  const sshClient = sshClients[clientID];
-  if (!sshClient) {
+ipcMain.on('ssh:send', async (event, clientID, data) => {
+  const session = await getSession(clientID);
+  if (!session) {
     return;
   }
-  if (!sshClient.isConnected) {
-    delete sshClients[clientID];
-    return;
-  }
-  sshClient.send(data);
+  session.sshClient.send(data);
 });
 
 ipcMain.on('bell', (event) => {
@@ -174,36 +158,24 @@ ipcMain.on('bell', (event) => {
 });
 
 ipcMain.handle('ssh:read-dir', async (_, clientID, path) => {
-  const sshClient = sshClients[clientID];
-  if (!sshClient) {
+  const session = await getSession(clientID);
+  if (!session) {
     return;
   }
-  if (!sshClient.isConnected) {
-    delete sshClients[clientID];
-    return;
-  }
-  return sshClient.readDir(path);
+  return session.sshClient.readDir(path);
 });
 
 ipcMain.handle('ssh:get-home-dir', async (_, clientID) => {
-  const sshClient = sshClients[clientID];
-  if (!sshClient) {
+  const session = await getSession(clientID);
+  if (!session) {
     return;
   }
-  if (!sshClient.isConnected) {
-    delete sshClients[clientID];
-    return;
-  }
-  return sshClient.getHomeDir();
+  return session.sshClient.getHomeDir();
 });
 
 async function uploadFiles(clientID, filePaths, remotePath) {
-  const sshClient = sshClients[clientID];
-  if (!sshClient) {
-    return;
-  }
-  if (!sshClient.isConnected) {
-    delete sshClients[clientID];
+  const session = await getSession(clientID);
+  if (!session) {
     return;
   }
   for (const i in filePaths) {
@@ -223,30 +195,30 @@ async function uploadFiles(clientID, filePaths, remotePath) {
         console.log(`remoteFilePath=${remoteFilePath}`);
         const remoteDirPath = path.dirname(remoteFilePath);
         console.log(`remoteDirPath=${remoteDirPath}`);
-        let stat = await sshClient.stat(remoteDirPath);
+        let stat = await session.sshClient.stat(remoteDirPath);
         if (!stat) {
-          await sshClient.mkdir(remoteDirPath);
+          await session.sshClient.mkdir(remoteDirPath);
         }
-        stat = await sshClient.stat(remoteFilePath);
+        stat = await session.sshClient.stat(remoteFilePath);
         if (stat) {
           // 文件已存在，需要人工确认一下
           console.log('file exists, need confirm');
         }
         if (uploadFilePath.endsWith('||aaisdirbb')) {
-          await sshClient.mkdir(remoteFilePath);
+          await session.sshClient.mkdir(remoteFilePath);
         } else {
-          await sshClient.upload(uploadFilePath, remoteFilePath);
+          await session.sshClient.upload(uploadFilePath, remoteFilePath);
         }
       }
     } else {
       mainWindow.webContents.send(`ssh:transfer-file-list-${clientID}`, 'upload', [filePath]);
-      const stat = await sshClient.stat(path.join(remotePath, basename).replaceAll('\\', '/'));
+      const stat = await session.sshClient.stat(path.join(remotePath, basename).replaceAll('\\', '/'));
       console.log(stat);
       if (stat) {
         // 文件已存在，需要人工确认一下
         console.log('file exists, need confirm');
       }
-      await sshClient.upload(filePath, path.join(remotePath, basename).replaceAll('\\', '/'));
+      await session.sshClient.upload(filePath, path.join(remotePath, basename).replaceAll('\\', '/'));
     }
   }
 }
@@ -366,16 +338,12 @@ async function getAllRemoteFilePaths(sshClient, dirPath) {
 }
 
 async function download(clientID, remotePath, localPath) {
-  const sshClient = sshClients[clientID];
-  if (!sshClient) {
-    return;
-  }
-  if (!sshClient.isConnected) {
-    delete sshClients[clientID];
+  const session = await getSession(clientID);
+  if (!session) {
     return;
   }
 
-  let stat = await sshClient.stat(remotePath);
+  let stat = await session.sshClient.stat(remotePath);
   if (!stat) {
     console.log('file not exist', remotePath);
     return;
@@ -388,11 +356,11 @@ async function download(clientID, remotePath, localPath) {
     // 普通文件
     console.log('file');
     mainWindow.webContents.send(`ssh:transfer-file-list-${clientID}`, 'download', [remotePath]);
-    await sshClient.download(remotePath, path.join(localPath, basename));
+    await session.sshClient.download(remotePath, path.join(localPath, basename));
   } else if (fileType === 4) {
     // 目录
     console.log('dir');
-    const remoteFilePaths = await getAllRemoteFilePaths(sshClient, remotePath);
+    const remoteFilePaths = await getAllRemoteFilePaths(session.sshClient, remotePath);
     console.log(remoteFilePaths);
     mainWindow.webContents.send(`ssh:transfer-file-list-${clientID}`, 'download', remoteFilePaths);
     for (const remoteFilePath of remoteFilePaths) {
@@ -414,7 +382,7 @@ async function download(clientID, remotePath, localPath) {
       if (remoteFilePath.endsWith('/')) {
         await mkdir(localFilePath);
       } else {
-        await sshClient.download(remoteFilePath, localFilePath);
+        await session.sshClient.download(remoteFilePath, localFilePath);
       }
     }
   } else {
@@ -423,15 +391,11 @@ async function download(clientID, remotePath, localPath) {
 }
 
 async function remove(clientID, remotePath) {
-  const sshClient = sshClients[clientID];
-  if (!sshClient) {
+  const session = await getSession(clientID);
+  if (!session) {
     return;
   }
-  if (!sshClient.isConnected) {
-    delete sshClients[clientID];
-    return;
-  }
-  await sshClient.remove(remotePath);
+  await session.sshClient.remove(remotePath);
 }
 
 ipcMain.on('ssh:show-context-menu', (event, type, args) => {
@@ -445,6 +409,10 @@ ipcMain.on('ssh:show-context-menu', (event, type, args) => {
           label: editor.name,
           click: async () => {
             console.log(editor.path, args.remotePath, args.clientID);
+            const session = await getSession(args.clientID);
+            if (!session) {
+              return;
+            }
             // 先下载到临时文件夹
             const tmpDir = os.tmpdir();
             console.log(tmpDir);
@@ -457,6 +425,7 @@ ipcMain.on('ssh:show-context-menu', (event, type, args) => {
             if (!fs.existsSync(rootPath)) {
               // 创建文件夹，并增加监听
               await mkdir(rootPath);
+              session.tmpDir = rootPath;
               const watcher = chokidar.watch(rootPath, {
                 persistent: true,
                 recursive: true, // 是否递归监听子目录
@@ -475,6 +444,7 @@ ipcMain.on('ssh:show-context-menu', (event, type, args) => {
                   uploadFiles(clientID, [filePath], remoteDirPath);
                 }
               });
+              session.watcher = watcher;
             }
             if (!fs.existsSync(dirPath)) {
               await mkdir(dirPath);
@@ -697,5 +667,8 @@ ipcMain.handle('dialog:showOpenDialog', async (event, options) => {
 });
 
 ipcMain.handle('clipboard:get-file-path', (event) => {
-  return clipboard.readBuffer('FileNameW').toString('ucs2').replace(RegExp(String.fromCharCode(0), 'g'), '');
+  return clipboard
+    .readBuffer('FileNameW')
+    .toString('ucs2')
+    .replace(RegExp(String.fromCharCode(0), 'g'), '');
 });
