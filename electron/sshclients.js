@@ -31,6 +31,10 @@ class SSHClient {
         .on('error', (err) => {
           reject(err);
         })
+        .on('close', () => {
+          console.log('connection closed')
+          this.isConnected = false;
+        })
         .connect(this.connConfig);
     });
   }
@@ -49,9 +53,11 @@ class SSHClient {
             this.win.webContents.send(`ssh:receive-${this.clientID}`, data.toString());
           })
           .on('close', () => {
+            console.log('stream closed')
             this.sshClient.end();
-            this.isConnected = false;
-            this.win.webContents.send(`ssh:close-${this.clientID}`);
+            if (!this.win.isDestroyed() && !this.win.webContents.isDestroyed()) {
+              this.win.webContents.send(`ssh:close-${this.clientID}`);
+            }
           });
         stream.stderr.on('data', (data_1) => {
           this.win.webContents.send(`ssh:receive-${this.clientID}`, data_1.toString());
@@ -87,10 +93,35 @@ class SSHClient {
     }
   }
 
-  disconnect() {
-    if (this.sshClient) {
+  async disconnect() {
+    if (this.sshClient && this.isConnected) {
       this.sshClient.end();
+      await this.waitForDisconnect();
     }
+  }
+
+  waitForDisconnect(timeout = 5000, interval = 100) {
+    return new Promise((resolve, reject) => {
+      let elapsed = 0;
+
+      const check = () => {
+        if (!this.isConnected) {
+          resolve(); // 连接已断开
+          return;
+        }
+
+        if (elapsed >= timeout) {
+          console.log('disconnect timeout');
+          resolve(); // 连接已断开
+          return;
+        }
+
+        elapsed += interval;
+        setTimeout(check, interval);
+      };
+
+      check();
+    });
   }
 
   readDir(path) {

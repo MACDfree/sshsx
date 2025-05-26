@@ -14,7 +14,7 @@ class Session {
   }
 
   async clear() {
-    this.sshClient.disconnect();
+    await this.sshClient.disconnect();
     // 如果有watcher，需要关闭watcher
     if (this.watcher) {
       await this.watcher.close();
@@ -62,4 +62,11 @@ async function clearSession(id) {
   delete sessions[id];
 }
 
-export { getSession, addSession, clearSession };
+async function clearAllSessions() {
+  console.log(sessions)
+  for (const id in sessions) {
+    await clearSession(id);
+  }
+}
+
+export { getSession, addSession, clearSession, clearAllSessions };

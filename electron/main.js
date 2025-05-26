@@ -8,7 +8,7 @@ import yaml from 'js-yaml';
 import os from 'os';
 import chokidar from 'chokidar';
 import execFile from 'node:child_process';
-import { addSession, clearSession, getSession } from './sessions';
+import { addSession, clearSession, getSession, clearAllSessions } from './sessions';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -103,10 +103,16 @@ app.whenReady().then(async () => {
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async() => {
   if (process.platform !== 'darwin') {
+    await clearAllSessions();
     app.quit();
   }
+});
+
+app.on('before-quit', async () => {
+  console.log('clearing sessions...');
+  await clearAllSessions();
 });
 
 // In this file you can include the rest of your app's specific main process
