@@ -499,9 +499,12 @@ ipcMain.on('ssh:show-context-menu', (event, type, args) => {
             const { response } = await dialog.showMessageBox(mainWindow, {
               message: `是否删除${args.remotePath}？`,
               type: 'warning',
-              buttons: ['是', '否'],
+              buttons: ['否', '是'],
+              defaultId: 0,
+              cancelId: 0,
             });
-            if (response === 0) {
+            console.log(response);
+            if (response === 1) {
               mainWindow.webContents.send(`ssh:delete-file-listen-${args.clientID}`, 'start');
               await remove(args.clientID, args.remotePath);
               mainWindow.webContents.send(`ssh:delete-file-listen-${args.clientID}`, 'end');
